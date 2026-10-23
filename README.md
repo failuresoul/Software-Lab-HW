@@ -1,15 +1,21 @@
 # University Management System
-### CSE 3230 – Home Task (Lab 4) · Java Spring Boot
+### CSE 3230 – Home Task (Lab 4) · Java Spring Boot · Spring Security · Docker
 
-A simple web application with three user roles: **Admin**, **Teacher** and **Student**.
+This is a simple web application with three user roles: **Admin**, **Teacher** and **Student**.
+This README explains **everything**: how to run it (IntelliJ and Docker), how to use it, **how to present it to your teacher**, and what every file and line of code does.
 
-| Requirement from the task | How this project does it |
-|---|---|
-| **REST API**: CRUD for Admin, Teacher, Student with JSON and HTTP status codes | `AdminController`, `TeacherController`, `StudentController` (GET / POST / PUT / DELETE). Also `CourseController` and `RegistrationController` |
-| **Spring Security**: login, logout, password hashing, role-based access | `SecurityConfig`, `MyUserDetailsService`, BCrypt, login page with role selection |
-| **Dockerization**: Dockerfile + compose.yaml | `Dockerfile` (builds the app) + `compose.yaml` (runs app + MySQL together) |
+---
 
-### Who can manage what (the task's rule)
+## The task and how this project meets it
+
+| Requirement from the task | How this project does it | Where to look |
+|---|---|---|
+| **REST API**: CRUD (Create, Read, Update, Delete) for Admin, Teacher and Student, with REST conventions, JSON responses and HTTP status codes | `GET` / `POST` / `PUT` / `DELETE` on `/api/admins`, `/api/teachers`, `/api/students`. Answers are JSON with status codes 200, 201, 204, 400, 401, 403, 404, 409 | `controller/` folder |
+| **Spring Security**: login, logout, password hashing, role-based access control (RBAC) | Login page with role selection, `/logout`, **BCrypt** password hashes, URL rules per role, plus "own account only" checks | `security/` folder + controllers |
+| **Dockerization**: Dockerfile and compose.yaml, services run together with Docker Compose | `Dockerfile` builds the app image. `compose.yaml` runs the **app + MySQL** together | `Dockerfile`, `compose.yaml` |
+| **Note**: Admins manage all three resources, teachers only teachers, students only students | Admin → all 3. Teacher → only `/api/teachers` (403 for the others). Student → only `/api/students` (403 for the others) | `SecurityConfig.java` |
+
+### The role rule (from the task's note)
 
 | Logged in as | Admins | Teachers | Students |
 |---|:---:|:---:|:---:|
@@ -21,40 +27,391 @@ Inside their own section, teachers and students work like in a real university:
 
 | Action | Admin | Teacher (in Teachers) | Student (in Students) |
 |---|---|---|---|
-| **Read**: list of all records | ✅ all three lists | ✅ all teachers | ✅ all students |
-| **Create**: add a new record | ✅ | ❌ only the admin creates accounts | ❌ only the admin creates accounts |
+| **Read**: see all records | ✅ all three lists | ✅ all teachers | ✅ all students |
+| **Create**: add a record | ✅ | ❌ only the admin creates accounts | ❌ only the admin creates accounts |
 | **Update**: edit a record | ✅ anyone | ✅ **only their own account** | ✅ **only their own account** |
-| **Delete**: remove a record | ✅ anyone **except themselves** | ✅ **only their own account** (then logged out) | ✅ **only their own account** (then logged out) |
+| **Delete**: remove a record | ✅ anyone **except themselves** | ✅ **only their own account** | ✅ **only their own account** |
 
-### Extra realistic work: Courses and Course Registration
+### Extra (beyond the task): Courses and Course Registration
 
 | | Admin | Teacher | Student |
 |---|---|---|---|
-| **Courses** | full CRUD, chooses the teacher of a course | sees all courses; **adds their own courses**; edits and deletes **only their own** | sees all courses and clicks **Register** |
-| **Registrations** | full CRUD | sees **the students registered in their courses** (read only) | **My Registrations**: register, change section, drop a course |
-
-Breaking any rule gives **403 Forbidden** from the server. The web page also shows only the buttons you are allowed to use.
+| **Courses** | full CRUD, chooses the teacher | sees all; **adds own courses**; edits and deletes **only own** | sees all; clicks **Register** |
+| **Registrations** | full CRUD | sees **students in own courses** (read only) | **My Registrations**: register, change section, drop |
 
 ---
 
 ## Table of contents
-1. [Ready-made accounts and data](#1-ready-made-accounts-and-data)
-2. [How to run in IntelliJ IDEA (step by step)](#2-how-to-run-in-intellij-idea-step-by-step)
-3. [How to run with Docker](#3-how-to-run-with-docker)
-4. [How to use the app](#4-how-to-use-the-app)
-5. [REST API reference](#5-rest-api-reference)
-6. [Project structure](#6-project-structure)
-7. [Spring Boot basics (for viva)](#7-spring-boot-basics-for-viva)
-8. [Every file explained line by line](#8-every-file-explained-line-by-line)
-9. [Docker explained](#9-docker-explained)
-10. [Viva questions and answers](#10-viva-questions-and-answers)
-11. [Common problems](#11-common-problems)
+
+1. [What you need to install](#1-what-you-need-to-install)
+2. [Run the project in IntelliJ IDEA](#2-run-the-project-in-intellij-idea)
+3. [Docker: the complete guide](#3-docker-the-complete-guide)
+4. [Accounts and sample data](#4-accounts-and-sample-data)
+5. [How to use the app](#5-how-to-use-the-app)
+6. [REST API reference](#6-rest-api-reference)
+7. [⭐ How to present the project to your teacher](#7--how-to-present-the-project-to-your-teacher)
+8. [Project structure](#8-project-structure)
+9. [Spring Boot basics](#9-spring-boot-basics)
+10. [Every file explained line by line](#10-every-file-explained-line-by-line)
+11. [Viva questions and answers](#11-viva-questions-and-answers)
+12. [Common problems](#12-common-problems)
 
 ---
 
-## 1. Ready-made accounts and data
+## 1. What you need to install
 
-When the app starts with empty tables, `DataLoader.java` adds this sample data:
+| Tool | Needed for | Download | Check it works (type in a terminal) |
+|---|---|---|---|
+| **IntelliJ IDEA** (Community, free) | opening and running the project | https://www.jetbrains.com/idea/download | – |
+| **Java JDK 17** | running Java (IntelliJ can download it for you) | inside IntelliJ, or https://adoptium.net | `java -version` → shows `17` |
+| **Docker Desktop** | the Docker part of the task | https://www.docker.com/products/docker-desktop | `docker --version` and `docker compose version` |
+| **Postman** (free) | showing the REST API to your teacher | https://www.postman.com/downloads | – |
+| A web browser | using the app | – | – |
+
+> You do **not** need to install MySQL or Maven.
+> - In IntelliJ, the app uses a built-in database file (**H2**).
+> - In Docker, MySQL runs inside a container.
+> - IntelliJ already contains Maven.
+
+---
+
+## 2. Run the project in IntelliJ IDEA
+
+### 2.1 First time: open the project
+
+1. Start **IntelliJ IDEA**.
+2. On the welcome screen click **Open** (or use **File → Open...** in an open window).
+3. Find and select the folder **`Software Lab-HW`**, the one that contains `pom.xml`. Click **OK**.
+4. If it asks *"Trust and Open Project?"*, click **Trust Project**.
+5. IntelliJ sees `pom.xml` and knows it is a **Maven project**. It starts downloading all libraries. Look at the **progress bar at the bottom right** and **wait until it disappears**. The first time this takes 2–5 minutes and needs internet.
+
+### 2.2 First time: set Java 17
+
+1. Go to **File → Project Structure...** (or press `Ctrl + Alt + Shift + S`).
+2. On the left, click **Project**.
+3. In **SDK**, choose a **17** version.
+   - If there is no 17: click the SDK list → **Download JDK...** → Version **17**, any vendor (e.g. *Eclipse Temurin*) → **Download**.
+4. Click **OK**.
+
+### 2.3 Run the app
+
+1. In the **Project** panel on the left, open:
+   ```
+   Software Lab-HW
+   └── src
+       └── main
+           └── java
+               └── com.university.ums
+                   └── UmsApplication.java     ← open this file
+   ```
+2. You see a **green ▶ triangle** next to `public class UmsApplication` (line 7). Click it → **Run 'UmsApplication.main()'**.
+3. The **Run** window opens at the bottom, and many log lines appear. Wait for this line:
+   ```
+   Started UmsApplication in 4.5 seconds
+   ```
+4. Open the browser at **http://localhost:8081**. The login page appears.
+5. Log in with **Login as: Admin**, username **`admin`**, password **`admin123`**.
+
+### 2.4 Stop, run again, reset
+
+| To... | Do this |
+|---|---|
+| **Stop** the app | Click the red **■ Stop** button in the Run window (or `Ctrl + F2`). |
+| **Run again** | Click the green **▶ Run** button at the top right (or `Shift + F10`). |
+| **Restart after changing code** | Stop, then Run again. |
+| **Start with fresh data** | Stop the app → delete the **`data`** folder in the project → Run again. The sample data from [section 4](#4-accounts-and-sample-data) is created again. |
+
+> **Where is my data?** In the file `data/ums.mv.db` inside the project. It stays when you stop the app.
+
+### 2.5 If something goes wrong in IntelliJ
+
+| Problem | Fix |
+|---|---|
+| Red underlined code, "Cannot resolve symbol" | Open the **Maven** tab on the right edge → click 🔄 **Reload All Maven Projects**. Wait for it to finish. |
+| No green ▶ next to the class | Maven isn't finished yet, so wait. Or right-click `UmsApplication.java` → **Run 'UmsApplication.main()'**. |
+| `Port 8081 was already in use` | The app is already running (maybe in Docker or another Run window). Stop the other one first. |
+| "java: error: release version 17 not supported" | The SDK isn't 17. Repeat [2.2](#22-first-time-set-java-17). |
+| Login says "Wrong username, password or role!" | Choose the correct **Login as** role. Passwords are case-sensitive. |
+
+### 2.6 Optional: run with Maven in a terminal
+If Maven is installed: open IntelliJ's **Terminal** tab (bottom) and type `mvn spring-boot:run`. Stop with `Ctrl + C`.
+
+---
+
+## 3. Docker: the complete guide
+
+### 3.1 What is Docker? (simple explanation)
+
+Docker runs programs inside **containers**. A container is like a small, separate computer that already has everything the program needs. So the app runs **the same way on every PC**, without installing Java or MySQL on the PC itself.
+
+| Word | Simple meaning | In this project |
+|---|---|---|
+| **Image** | A packed "box" with everything a program needs (system files + Java + our app). Like a **class** in Java. | `mysql:8.0` (downloaded) and **our app's image** (built from the `Dockerfile`) |
+| **Container** | A **running** image. Like an **object** created from a class. | 2 containers: **db** and **app** |
+| **Dockerfile** | A **recipe** that says how to build an image. | Builds our Spring Boot app into an image |
+| **Docker Compose** | Starts **several containers together** from one file. | `compose.yaml` starts **MySQL + our app** |
+| **Volume** | Storage outside the container, so data is not lost. | `db_data` keeps the MySQL data |
+| **Port mapping** `8081:8081` | `PC port : container port`, so the browser on your PC can reach the container. | app → 8081, MySQL → 3307 |
+| **Docker Hub** | An online store of ready images. | `mysql`, `maven`, `eclipse-temurin` come from there |
+
+### 3.2 How THIS project uses Docker
+
+```
+                         your PC (Windows)
+ ┌────────────────────────────────────────────────────────────────────┐
+ │  Browser / Postman                                                 │
+ │      │  http://localhost:8081                                      │
+ │      ▼                                                             │
+ │  ┌───────────────── Docker (started by compose.yaml) ───────────┐  │
+ │  │                                                              │  │
+ │  │   app container                     db container             │  │
+ │  │  ┌──────────────────────┐          ┌──────────────────────┐  │  │
+ │  │  │ Java 17              │  JDBC    │ MySQL 8              │  │  │
+ │  │  │ ums.jar (our app)    │ ───────► │ database             │  │  │
+ │  │  │ port 8081            │ "db:3306"│ "university_db"      │  │  │
+ │  │  └──────────────────────┘          └──────────┬───────────┘  │  │
+ │  │   built from our Dockerfile                   │ volume       │  │
+ │  │                                               ▼ "db_data"    │  │
+ │  └──────────────────────────────────────────────────────────────┘  │
+ └────────────────────────────────────────────────────────────────────┘
+```
+
+| | Running in **IntelliJ** | Running in **Docker** |
+|---|---|---|
+| Database | **H2** (a file in `data/`) | **MySQL 8** (its own container) |
+| Who starts the app | You, with the ▶ button | Docker Compose |
+| Address | http://localhost:8081 | http://localhost:8081 (same) |
+| How the database is chosen | `application.properties` | `compose.yaml` **overrides** it with environment variables |
+
+**The code is exactly the same in both cases.** Only the database settings change, and Docker Compose changes them from outside.
+
+### 3.3 Install Docker Desktop on Windows (once)
+
+1. **Download** Docker Desktop: https://www.docker.com/products/docker-desktop → *Download for Windows*.
+2. **Run the installer.** Keep **"Use WSL 2 instead of Hyper-V"** ticked → **OK**.
+3. **Restart** the PC when it asks.
+4. Start **Docker Desktop** from the Start menu. Accept the terms, and skip sign-in if you want (you don't need an account).
+5. Wait until the bottom-left corner shows **"Engine running"** (green).
+6. Check in a terminal (CMD, PowerShell or IntelliJ's Terminal):
+   ```
+   docker --version
+   docker compose version
+   ```
+   Both print a version number → Docker works. ✅
+
+| Install problem | Fix |
+|---|---|
+| "WSL 2 installation is incomplete" | Open **PowerShell as Administrator**, run `wsl --install`, restart the PC. |
+| "Virtualization must be enabled" | Restart → open BIOS (usually `F2`, `F10` or `Del` while starting) → enable **Intel VT-x** / **AMD-V (SVM)** → save and restart. |
+| `docker` is not recognized | Docker Desktop isn't installed, or the terminal was opened before installing. Close and reopen the terminal. |
+| "Cannot connect to the Docker daemon" | Docker Desktop isn't running. Start it and wait for "Engine running". |
+
+### 3.4 Run the project with Docker, step by step
+
+1. **Start Docker Desktop** and wait for **"Engine running"**.
+2. **Stop the app in IntelliJ** if it is running (red ■), because both use port **8081**.
+3. Open a terminal **in the project folder**. The easiest way is IntelliJ's **Terminal** tab at the bottom, which already opens in the project folder.
+4. Type:
+   ```
+   docker compose up --build
+   ```
+   What happens now:
+   1. Docker downloads the images **mysql:8.0**, **maven** and **eclipse-temurin** (only the first time, a few minutes).
+   2. It **builds our app image** from the `Dockerfile`, with Maven compiling the code inside Docker.
+   3. It **starts the db container** (MySQL) and waits until MySQL is healthy.
+   4. It **starts the app container**, which connects to MySQL, creates the tables and adds the sample data.
+5. Wait for this line in the output:
+   ```
+   app-1  | ... Started UmsApplication in 7.9 seconds
+   ```
+6. Open **http://localhost:8081** and log in (`admin` / `admin123`).
+7. **To stop:** press `Ctrl + C` in the terminal, then type:
+   ```
+   docker compose down
+   ```
+
+> **Run in the background instead:** `docker compose up -d --build` (`-d` = detached). The terminal is free again. See the logs with `docker compose logs -f app` (stop watching with `Ctrl + C`).
+
+### 3.5 Check that the containers are running
+
+```
+docker compose ps
+```
+The output looks similar to this (the names come from the folder name):
+```
+NAME                 IMAGE                SERVICE   STATUS                   PORTS
+softwarelab-hw-app-1 softwarelab-hw-app   app       Up 2 minutes             0.0.0.0:8081->8081/tcp
+softwarelab-hw-db-1  mysql:8.0            db        Up 2 minutes (healthy)   0.0.0.0:3307->3306/tcp
+```
+**Two services run together**: `app` and `db`. That is exactly what the task asks for.
+
+You can also see them in **Docker Desktop → Containers**, with their logs and Start/Stop buttons.
+
+### 3.6 Look inside MySQL (proof of password hashing)
+
+While the containers are running, type:
+```
+docker compose exec db mysql -uroot -proot university_db -e "SELECT username, password FROM teacher;"
+```
+The output looks like this:
+```
++----------+--------------------------------------------------------------+
+| username | password                                                     |
++----------+--------------------------------------------------------------+
+| teacher1 | $2a$10$FiyCgK1LufVmK89JZ3FxAeHCubH7a8zaIWMc.BS271UE2rZ3XokDW |
++----------+--------------------------------------------------------------+
+```
+The password column holds a **BCrypt hash** (it starts with `$2a$10$`), **not** `teacher123`. That proves **password hashing**.
+(The warning *"Using a password on the command line interface can be insecure"* is normal; ignore it.)
+
+Other useful commands:
+```
+docker compose exec db mysql -uroot -proot university_db -e "SHOW TABLES;"
+docker compose exec db mysql -uroot -proot university_db -e "SELECT * FROM course;"
+```
+
+### 3.7 After you change the code
+
+Docker uses the **image** it built before. After changing code, **build again**:
+```
+docker compose up --build
+```
+
+### 3.8 Stop and clean up
+
+| Command | What it does | Your data |
+|---|---|---|
+| `Ctrl + C` | Stops the containers when they run in the foreground. | kept |
+| `docker compose stop` | Stops the containers (start again: `docker compose start`). | kept |
+| `docker compose down` | Stops **and removes** the containers. | **kept** (in the volume) |
+| `docker compose down -v` | Removes the containers **and the volume**, for a fresh start next time. | **deleted** |
+
+### 3.9 All Docker commands in one place
+
+| Command | Meaning |
+|---|---|
+| `docker --version` | Is Docker installed? |
+| `docker compose up --build` | Build the app image and start app + MySQL (with logs on the screen). |
+| `docker compose up -d --build` | The same, but in the background. |
+| `docker compose ps` | Which containers are running. |
+| `docker compose logs app` | The app's logs (`-f` keeps following). |
+| `docker compose logs db` | MySQL's logs. |
+| `docker compose exec db mysql -uroot -proot university_db` | Open the MySQL console inside the db container (type `exit;` to leave). |
+| `docker compose down` | Stop and remove the containers. |
+| `docker compose down -v` | The same + delete the MySQL data. |
+| `docker images` | List the images on your PC. |
+| `docker build -t ums .` | Build only the app image from the Dockerfile. |
+
+### 3.10 The `Dockerfile` line by line
+
+The Dockerfile has **two stages**. Stage 1 **builds** the jar with Maven. Stage 2 **runs** it with only Java. The final image is small because it doesn't contain Maven or the source code.
+
+```dockerfile
+# Step 1: build the jar file using Maven
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn -q package -DskipTests
+
+# Step 2: run the jar file using only Java
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=build /app/target/ums.jar app.jar
+EXPOSE 8081
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+| Line | Meaning |
+|---|---|
+| `# Step 1: ...` | A comment. |
+| `FROM maven:3.9-eclipse-temurin-17 AS build` | Start from an image that has **Maven 3.9 + Java 17**. This stage is called `build`. |
+| `WORKDIR /app` | Inside the container, work in the folder `/app` (it is created if missing). |
+| `COPY pom.xml .` | Copy `pom.xml` from the PC into `/app`. |
+| `COPY src ./src` | Copy the `src` folder (all the code) into `/app/src`. |
+| `RUN mvn -q package -DskipTests` | Run Maven: compile and package into `/app/target/ums.jar`. `-q` = quiet, `-DskipTests` = don't run tests. |
+| `# Step 2: ...` | A comment. |
+| `FROM eclipse-temurin:17-jre` | Start a **new, small** image with only the **Java 17 runtime**. |
+| `WORKDIR /app` | Work in `/app`. |
+| `COPY --from=build /app/target/ums.jar app.jar` | Copy **only the jar** from stage 1 and name it `app.jar`. |
+| `EXPOSE 8081` | Says the app listens on port 8081 (documentation). |
+| `ENTRYPOINT ["java", "-jar", "app.jar"]` | The command that runs when the container starts: start our app. |
+
+### 3.11 The `compose.yaml` line by line
+
+```yaml
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: university_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/university_db?allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+volumes:
+  db_data:
+```
+
+| Line(s) | Meaning |
+|---|---|
+| `services:` | The list of containers to run together. |
+| `db:` | Service 1, named **db**. The name is also its address inside Docker. |
+| `image: mysql:8.0` | Use the official **MySQL 8** image from Docker Hub. |
+| `MYSQL_ROOT_PASSWORD: root` | Set the MySQL root password to `root`. |
+| `MYSQL_DATABASE: university_db` | Create a database named `university_db` on the first start. |
+| `ports: - "3307:3306"` | PC port **3307** → MySQL's port 3306 in the container. 3307 avoids a clash with a MySQL installed on the PC. |
+| `volumes: - db_data:/var/lib/mysql` | Save MySQL's files (`/var/lib/mysql`) in the volume **db_data**, so the data survives `docker compose down`. |
+| `healthcheck:` | How Docker checks that MySQL is ready. |
+| `test: [... "mysqladmin", "ping" ...]` | Run `mysqladmin ping`. If it answers, MySQL is **healthy**. |
+| `interval: 5s` / `timeout: 5s` / `retries: 20` | Check every 5 seconds, wait at most 5 seconds per check, and try up to 20 times. |
+| `app:` | Service 2, named **app**: our Spring Boot app. |
+| `build: .` | Build the image from the **Dockerfile in this folder** (`.`). |
+| `ports: - "8081:8081"` | PC port 8081 → app port 8081, so **http://localhost:8081** works. |
+| `SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/...` | **Replaces** the H2 database setting with MySQL. The host is **`db`**, the service name above, because containers in one compose file find each other by service name. `allowPublicKeyRetrieval=true&useSSL=false` lets the Java driver log in to MySQL 8 without SSL. |
+| `SPRING_DATASOURCE_USERNAME: root` / `..._PASSWORD: root` | The MySQL login for the app. |
+| `depends_on: db: condition: service_healthy` | Start the app **only after MySQL is healthy**. |
+| `restart: on-failure` | If the app crashes (for example, MySQL was not 100% ready), Docker starts it again. |
+| `volumes: db_data:` | Declares the named volume used by `db`. |
+
+> **How do the environment variables change the database?** Spring Boot reads settings from `application.properties` **and** from environment variables. An environment variable named `SPRING_DATASOURCE_URL` **wins over** `spring.datasource.url` in the file. So the same code uses H2 in IntelliJ and MySQL in Docker.
+
+### 3.12 Docker problems while running
+
+| Problem | Fix |
+|---|---|
+| `Bind for 0.0.0.0:8081 failed: port is already allocated` | Something else uses 8081, usually the app in IntelliJ. Stop it and run again. |
+| `Bind for 0.0.0.0:3307 failed` | Change `"3307:3306"` to `"3308:3306"` in `compose.yaml`. |
+| App logs show `Communications link failure` | MySQL wasn't ready yet. The app restarts by itself (`restart: on-failure`), so wait a few seconds. |
+| The app shows old behaviour after code changes | Run `docker compose up --build`, with `--build`. |
+| You want empty tables again | `docker compose down -v`, then `docker compose up --build`. |
+| Build fails with download errors | Check the internet connection (Maven downloads libraries inside Docker) and try again. |
+
+---
+
+## 4. Accounts and sample data
+
+When the database is empty, `DataLoader.java` creates:
 
 | Login as | Username | Password |
 |---|---|---|
@@ -69,81 +426,18 @@ When the app starts with empty tables, `DataLoader.java` adds this sample data:
 
 There is also one registration: **student1** in **CSE3230**, section **A**.
 
-On the login page, **choose the correct role** in "Login as". A teacher who chooses "Student" gets *"Wrong username, password or role!"*.
-
 ---
 
-## 2. How to run in IntelliJ IDEA (step by step)
+## 5. How to use the app
 
-You **don't need to install any database** to run in IntelliJ. The app uses **H2**, a small database saved as a file in the `data` folder of the project.
-
-### What you need
-- **IntelliJ IDEA** (the free Community edition is enough)
-- **Java JDK 17** (IntelliJ can download it for you, see step 4)
-- An internet connection the first time, to download the libraries
-
-### Steps
-
-1. **Open IntelliJ IDEA.**
-2. **File → Open...** (or **Open** on the welcome screen) and select the folder **`Software Lab-HW`**, the one that contains `pom.xml`. Click **OK**.
-3. If it asks *"Trust and open project?"*, click **Trust Project**.
-4. **Set Java 17:** go to **File → Project Structure → Project**, then **SDK**, and choose **17**.
-   If 17 is not in the list, choose **Add SDK → Download JDK...**, pick version **17** and click **Download**. Then click **OK**.
-5. **Wait for Maven.** IntelliJ reads `pom.xml` and downloads all libraries (progress bar at the bottom right). The first time takes a few minutes.
-   If the code shows red errors or "cannot resolve symbol", open the **Maven** tab on the right side and click 🔄 **Reload All Maven Projects**.
-6. In the **Project** panel on the left, open:
-   `src → main → java → com.university.ums → UmsApplication.java`
-7. Click the green **▶** next to `public class UmsApplication` (or next to `main`) and choose **Run 'UmsApplication.main()'**.
-8. The **Run** window opens at the bottom. Wait for this line:
-   ```
-   Started UmsApplication in 5.123 seconds
-   ```
-9. Open your browser at **http://localhost:8081**
-10. Log in, for example *Login as* **Admin**, username `admin`, password `admin123`.
-11. **To stop the app:** click the red **■** (Stop) button in the Run window.
-
-> **Why port 8081 and not 8080?** Other programs often use port 8080 (Oracle Database uses it on this PC), so this project uses **8081**.
-
-> **Where is the data?** In the `data` folder in the project (`data/ums.mv.db`). It stays after you stop the app. To start again with fresh data, stop the app, delete the `data` folder and run again. The sample data from section 1 is created again.
-
-### Run with Maven from the terminal (optional)
-In IntelliJ's **Terminal** tab (at the bottom), type:
-```
-mvn spring-boot:run
-```
-This needs Maven installed. The IntelliJ ▶ button doesn't.
-
----
-
-## 3. How to run with Docker
-
-With Docker, the app uses a real **MySQL** database instead of H2. Docker Compose starts **two containers together**: MySQL and the app.
-
-1. Install **Docker Desktop** from https://www.docker.com/products/docker-desktop. On Windows, accept **WSL 2** if it asks, then restart the PC.
-2. Start **Docker Desktop** and wait until it shows **"Engine running"**.
-3. **Stop the app in IntelliJ if it is running.** Both use port 8081.
-4. Open a terminal in the project folder (IntelliJ's **Terminal** tab is already in the right place) and run:
-   ```
-   docker compose up --build
-   ```
-5. The first time, Docker downloads MySQL, Java and Maven, which takes a few minutes. Wait for `Started UmsApplication`.
-6. Open **http://localhost:8081** and log in with the accounts from section 1.
-7. To stop: press `Ctrl + C`, then run `docker compose down`.
-
-All Docker commands are explained in [section 9](#9-docker-explained).
-
----
-
-## 4. How to use the app
-
-### Login page
-1. **Login as**: choose Admin, Teacher or Student.
+### 5.1 Login page
+1. **Login as**: choose **Admin**, **Teacher** or **Student**.
 2. Type the **Username** and **Password**.
 3. Click **Login**.
 
-If something is wrong, you see *"Wrong username, password or role!"*.
+A wrong password **or a wrong role** shows *"Wrong username, password or role!"*.
 
-### The dashboard
+### 5.2 The dashboard
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ University Management System          Logged in as teacher1 (TEACHER) | Logout │
@@ -166,100 +460,103 @@ If something is wrong, you see *"Wrong username, password or role!"*.
   Semester     [        ]
   [Save] [Cancel]
 ```
+- **Yellow rows are yours**: your account, your courses, your registrations.
+- **`-`** means the row belongs to someone else, so you can't change it.
+- The **Add New** form appears only where you are allowed to add.
 
-- **Yellow rows** are **yours**: your account, your courses, your registrations.
-- A row with `-` belongs to someone else, so you can't change it.
-- The **Add New** form is only shown where you are allowed to add.
-
-### What each role sees
+### 5.3 What each role can do
 
 | Role | Tabs | What they can do |
 |---|---|---|
-| **Admin** | Admins · Teachers · Students · Courses · Registrations | Everything in every tab. When adding a course, the admin types the **teacher username**. When adding a registration, the admin types the **course code** and **student username**. The admin can't delete their own admin account. |
-| **Teacher** | Teachers · Courses · Registrations | **Teachers:** see all teachers, edit or delete their own account. **Courses:** see all, **add** new courses (they become the teacher), edit or delete **their own** courses. **Registrations:** see who registered in **their** courses (read only). |
-| **Student** | Students · Courses · My Registrations | **Students:** see all students, edit or delete their own account. **Courses:** see all and click **Register** (asks for the section). **My Registrations:** see their courses, **Edit** = change section, **Drop** = leave the course. They can also register by typing a course code in the form. |
+| **Admin** | Admins · Teachers · Students · Courses · Registrations | **Everything** in every tab. When adding a course, type the teacher's **username**. When adding a registration, type the **course code** and the student's **username**. The admin can't delete their own admin account. |
+| **Teacher** | Teachers · Courses · Registrations | **Teachers:** see all; edit or delete own account. **Courses:** see all; **add** courses (they become the teacher); edit or delete **own** courses. **Registrations:** see students registered in **own** courses (read only). |
+| **Student** | Students · Courses · My Registrations | **Students:** see all; edit or delete own account. **Courses:** see all; click **Register** (asks for a section). **My Registrations:** **Edit** = change section, **Drop** = leave the course. |
 
-### How to do each operation
+### 5.4 How to do each operation
 
 | To... | Do this |
 |---|---|
-| **See all** (Read) | Open a tab. The table reloads after each change. |
-| **Add** (Create) | Fill the **Add New ...** form below the table and click **Save**. |
-| **Edit** (Update) | Click **Edit** on a row. The form fills with its data. Change it and click **Save**. For people, leave the password empty to keep the old one. |
-| **Delete / Drop** | Click **Delete** (or **Drop** for a registration) and confirm. |
-| **Register for a course** (student) | **Courses** tab → **Register** on a course → type a section (e.g. `A`) → OK. |
-| **Cancel editing** | Click **Cancel**. |
-| **Log out** | Click **Logout** at the top right. |
+| **Read** (see all) | Open a tab. The table reloads after every change. |
+| **Create** (add) | Fill the **Add New ...** form below the table → **Save**. |
+| **Update** (edit) | Click **Edit** on a row → change the values → **Save**. For people, leave the password empty to keep the old one. |
+| **Delete** | Click **Delete** (**Drop** for a registration) → confirm. |
+| **Register for a course** | Student → **Courses** → **Register** → type a section, e.g. `A` → **OK**. |
+| **Log out** | **Logout**, top right. |
 
-Some notes:
-- If you change **your own username or password**, the page says *"Your login details were changed. Please log in again."* and logs you out.
-- Deleting **your own account** logs you out.
+**Good to know:**
+- If you change **your own** username or password, you are logged out, so you can log in with the new details.
+- If you delete **your own** account, you are logged out.
 - Deleting a **course** also deletes its registrations.
-- Deleting a **teacher** also deletes their courses and those courses' registrations.
+- Deleting a **teacher** also deletes their courses (and those courses' registrations).
 - Deleting a **student** also deletes their registrations.
-- Passwords never appear in the table; they are stored as a hash. If someone forgets theirs, the **admin** edits the user and types a new password.
+- **Passwords are never shown.** If someone forgets theirs, the **admin** edits the user and types a new one.
 
 ---
 
-## 5. REST API reference
+## 6. REST API reference
 
-### People: `/api/admins`, `/api/teachers`, `/api/students`
+### 6.1 People: `/api/admins`, `/api/teachers`, `/api/students`
 
-| Method | URL | What it does | Who | Success | Errors |
+| Method | URL | Action | Who may do it | Success | Errors |
 |---|---|---|---|---|---|
-| GET    | `/api/{type}`      | list all    | that section's role + admin | **200** | 401, 403 |
-| GET    | `/api/{type}/{id}` | get one     | that section's role + admin | **200** | 401, 403, 404 |
-| POST   | `/api/{type}`      | create      | **admin only** | **201** | 400, 401, 403, 409 |
-| PUT    | `/api/{type}/{id}` | update      | admin, or **owner** (own account) | **200** | 400, 401, 403, 404, 409 |
-| DELETE | `/api/{type}/{id}` | delete      | admin (not themselves), or **owner** | **204** | 400, 401, 403, 404 |
+| GET    | `/api/{type}`      | list all | that section's role + admin | **200 OK** | 401, 403 |
+| GET    | `/api/{type}/{id}` | get one  | that section's role + admin | **200 OK** | 401, 403, 404 |
+| POST   | `/api/{type}`      | create   | **admin only** | **201 Created** | 400, 401, 403, 409 |
+| PUT    | `/api/{type}/{id}` | update   | admin, or the **owner** (own account) | **200 OK** | 400, 401, 403, 404, 409 |
+| DELETE | `/api/{type}/{id}` | delete   | admin (not themselves), or the **owner** | **204 No Content** | 400, 401, 403, 404 |
 
-### Courses: `/api/courses`
+### 6.2 Courses: `/api/courses`
 
-| Method | URL | What it does | Who | Success | Errors |
+| Method | URL | Action | Who | Success | Errors |
 |---|---|---|---|---|---|
-| GET    | `/api/courses`      | list all courses | everyone logged in | **200** | 401 |
-| GET    | `/api/courses/{id}` | get one course   | everyone logged in | **200** | 401, 404 |
-| POST   | `/api/courses`      | create a course  | admin, teacher (teacher = the course's teacher) | **201** | 400, 401, 403, 409 |
-| PUT    | `/api/courses/{id}` | update a course  | admin, or the course's **own teacher** | **200** | 400, 401, 403, 404, 409 |
-| DELETE | `/api/courses/{id}` | delete a course and its registrations | admin, or the course's **own teacher** | **204** | 401, 403, 404 |
+| GET    | `/api/courses`      | list all | everyone logged in | **200** | 401 |
+| GET    | `/api/courses/{id}` | get one  | everyone logged in | **200** | 401, 404 |
+| POST   | `/api/courses`      | create   | admin, teacher (the teacher becomes the course's teacher) | **201** | 400, 401, 403, 409 |
+| PUT    | `/api/courses/{id}` | update   | admin, or the course's **own teacher** | **200** | 400, 401, 403, 404, 409 |
+| DELETE | `/api/courses/{id}` | delete (and its registrations) | admin, or the course's **own teacher** | **204** | 401, 403, 404 |
 
-### Registrations: `/api/registrations`
+### 6.3 Registrations: `/api/registrations`
 
-| Method | URL | What it does | Who | Success | Errors |
+| Method | URL | Action | Who | Success | Errors |
 |---|---|---|---|---|---|
-| GET    | `/api/registrations`      | list: admin = all, teacher = in their courses, student = their own | everyone logged in | **200** | 401 |
+| GET    | `/api/registrations`      | list: **admin** all, **teacher** in own courses, **student** own | everyone logged in | **200** | 401 |
 | GET    | `/api/registrations/{id}` | get one (only if you may see it) | everyone logged in | **200** | 401, 403, 404 |
-| POST   | `/api/registrations`      | register a student in a course | admin, student (student = themselves) | **201** | 400, 401, 403, 409 |
+| POST   | `/api/registrations`      | register a student in a course | admin, student (registers themself) | **201** | 400, 401, 403, 409 |
 | PUT    | `/api/registrations/{id}` | change the section | admin, or the **own student** | **200** | 400, 401, 403, 404 |
 | DELETE | `/api/registrations/{id}` | drop the course | admin, or the **own student** | **204** | 401, 403, 404 |
 
-### Login and others
+### 6.4 Login and others
 
 | Method | URL | What it does | Result |
 |---|---|---|---|
-| GET  | `/api/me`  | who is logged in | `{"username":"teacher1","role":"TEACHER"}` |
-| POST | `/login`   | log in (form: role, username, password) | 302 → `/index.html`, or `/login.html?error` |
-| GET  | `/logout`  | log out | 302 → `/login.html?logout` |
+| GET  | `/api/me` | who is logged in | `{"username":"teacher1","role":"TEACHER"}` |
+| POST | `/login`  | log in (form fields: `role`, `username`, `password`) | 302 → `/index.html`, or `/login.html?error` |
+| GET  | `/logout` | log out | 302 → `/login.html?logout` |
 
-### What the status codes mean
+### 6.5 Status codes used
 
-| Code | Meaning | When |
+| Code | Name | Meaning in this app |
 |---|---|---|
-| 200 OK | Success | read or update worked |
-| 201 Created | New record made | POST worked |
-| 204 No Content | Done, nothing to return | DELETE worked |
-| 400 Bad Request | Your data is wrong | a required field is missing, teacher/course/student not found, or the admin tries to delete themselves |
-| 401 Unauthorized | Who are you? | not logged in, or wrong password |
-| 403 Forbidden | Not allowed | your role can't do this, or the record isn't yours |
-| 404 Not Found | No such record | wrong id |
-| 409 Conflict | Clash | username or course code already exists, or already registered in this course |
+| **200** | OK | Read or update worked. |
+| **201** | Created | A new record was created (POST). |
+| **204** | No Content | Deleted; there is nothing to send back. |
+| **400** | Bad Request | Required data is missing, a teacher/course/student wasn't found, or the admin tried to delete themselves. |
+| **401** | Unauthorized | Not logged in, or wrong password. |
+| **403** | Forbidden | Logged in, but your role may not do this, or the record isn't yours. |
+| **404** | Not Found | No record with this id. |
+| **409** | Conflict | The username or course code already exists, or the student is already registered. |
 
-### JSON bodies
+### 6.6 JSON bodies
 
 ```json
-// admin / teacher / student
+// admin
+{ "name": "Second Admin", "email": "a2@university.edu", "username": "admin2", "password": "pass123" }
+
+// teacher
 { "name": "Rahim Uddin", "email": "rahim@university.edu", "department": "CSE",
   "designation": "Lecturer", "username": "teacher1", "password": "teacher123" }
+
+// student
 { "name": "Karim Hasan", "email": "karim@university.edu", "roll": "2003001",
   "department": "CSE", "username": "student1", "password": "student123" }
 
@@ -273,32 +570,249 @@ Some notes:
 // change the section of a registration (PUT)
 { "section": "B" }
 ```
-
-A registration comes back with the full course and student inside it (no passwords):
+Responses **never contain a password**. Example response for a teacher:
 ```json
-{ "id": 1, "section": "A",
-  "student": { "id": 1, "name": "Karim Hasan", "roll": "2003001", "username": "student1", ... },
-  "course":  { "id": 1, "code": "CSE3230", "title": "Software Development Lab", "credit": 1.5,
-               "teacher": { "id": 1, "name": "Rahim Uddin", "username": "teacher1", ... } } }
+{ "id": 1, "name": "Rahim Uddin", "email": "rahim@university.edu", "department": "CSE",
+  "designation": "Lecturer", "username": "teacher1" }
 ```
 
-### Testing with Postman
-1. Choose the method and URL, for example `GET http://localhost:8081/api/courses`.
-2. **Authorization** tab → Type **Basic Auth** → username and password (e.g. `teacher1` / `teacher123`).
-3. For POST and PUT: **Body** → **raw** → **JSON**, then paste a body from above.
-4. Click **Send** and look at the status code.
+### 6.7 Testing with Postman
+**The easy way:** import the ready collection `UMS.postman_collection.json` (see [7.2](#72-get-postman-ready-import-the-collection)).
 
-### Testing with curl (Windows CMD)
-```
-curl -u student1:student123 http://localhost:8081/api/courses
-curl -u student1:student123 -X POST -H "Content-Type: application/json" -d "{\"course\":{\"code\":\"CSE3201\"},\"section\":\"A\"}" http://localhost:8081/api/registrations
-curl -u teacher1:teacher123 http://localhost:8081/api/registrations
-curl -u teacher1:teacher123 http://localhost:8081/api/students        (-> 403)
-```
+**By hand:**
+1. Choose the method and URL, e.g. `GET http://localhost:8081/api/teachers`.
+2. **Authorization** tab → **Basic Auth** → username + password (e.g. `admin` / `admin123`).
+3. For POST and PUT: **Body** → **raw** → **JSON** → paste a body from 6.6.
+4. **Send**, then look at the **status code** (top right of the response) and the JSON.
 
 ---
 
-## 6. Project structure
+## 7. ⭐ How to present the project to your teacher
+
+The teacher will check **three things** plus the **role note**. This plan shows **each one clearly**, in order, with what to click and what to say. It takes about **10–15 minutes**.
+
+### 7.1 Prepare before the presentation (the day before)
+
+| ✔ | Task |
+|---|---|
+| ☐ | IntelliJ installed, project opens, **runs** (section 2). |
+| ☐ | Docker Desktop installed, `docker compose up --build` has run **at least once** (so the images are already downloaded and the demo is fast). |
+| ☐ | Postman installed, collection **imported** (7.2). |
+| ☐ | **Fresh data:** stop the app and delete the `data` folder (IntelliJ), or run `docker compose down -v` (Docker). |
+| ☐ | Read [section 11 (viva questions)](#11-viva-questions-and-answers). |
+| ☐ | Decide: demo with **Docker** (recommended, it shows all 3 requirements in one run) or with IntelliJ + Docker at the end. |
+
+**Right before the presentation:**
+1. Start **Docker Desktop** and wait for "Engine running".
+2. Open the project in **IntelliJ** (to show the code).
+3. Open **Postman** with the collection.
+4. Open the **browser**.
+
+### 7.2 Get Postman ready (import the collection)
+
+The project contains **`UMS.postman_collection.json`**: **40 ready requests** in 3 folders, matching the 3 requirements. Each request has a **test** that checks the status code, so Postman shows ✅ **PASS** next to it.
+
+1. Open Postman → click **Import** (top left).
+2. Drag the file **`UMS.postman_collection.json`** from the project folder into the window (or click *files* and choose it) → **Import**.
+3. On the left you now see **"University Management System - Demo"** with 3 folders:
+   - **1. REST API - CRUD + JSON + status codes (as admin)**
+   - **2. Spring Security - login, roles (RBAC), own account**
+   - **3. Extra - Courses and Registrations**
+4. **Run requests one by one:** click a request → **Send**. You'll see the JSON, the status code and **Test Results**.
+5. **Run a whole folder at once:** hover over the folder → **⋯** → **Run folder** → **Run**. Every request shows PASS or FAIL.
+
+> The requests already contain the right username and password (Authorization tab → Basic Auth) and the right JSON body. The address is in the collection **Variables** tab (`baseUrl = http://localhost:8081`).
+> **Run the folders in order (1 → 2 → 3).** Some requests use ids saved by earlier requests.
+
+### 7.3 The presentation plan
+
+| # | Part | Time | Shows the requirement |
+|---|---|---|---|
+| 1 | Introduction | 1 min | – |
+| 2 | Start with Docker | 2 min | **Dockerization** |
+| 3 | Short code tour | 2 min | structure of all three |
+| 4 | REST API with Postman | 3 min | **REST API: CRUD, JSON, status codes** |
+| 5 | Security in the browser + Postman | 4 min | **Login, logout, hashing, RBAC** + the role note |
+| 6 | Extra: courses and registrations | 1–2 min | bonus |
+| 7 | Stop Docker + summary | 1 min | – |
+
+---
+
+### Step 1: Introduction (1 minute)
+
+**Say:**
+> "I built a University Management System with Java Spring Boot. It has three roles: Admin, Teacher and Student.
+> It has a REST API with full CRUD for all three, Spring Security for login, logout, BCrypt password hashing and role-based access, and it runs with Docker Compose as two services: the app and a MySQL database.
+> As required, the admin can manage all three resources, teachers only teachers, and students only students."
+
+---
+
+### Step 2: Dockerization (2 minutes)
+
+1. In IntelliJ, open **`Dockerfile`** and **say:**
+   > "The Dockerfile has two stages. The first uses a Maven image to build the jar. The second copies only the jar into a small Java 17 runtime image and runs it on port 8081."
+2. Open **`compose.yaml`** and **say:**
+   > "Compose runs two services together: `db` is MySQL 8 with a volume for the data and a health check, and `app` is built from my Dockerfile. The app waits until MySQL is healthy, and environment variables point it at MySQL using the service name `db`."
+3. In IntelliJ's **Terminal**, run:
+   ```
+   docker compose up -d --build
+   ```
+   Then:
+   ```
+   docker compose ps
+   ```
+   **Show** the two containers, `app` and `db (healthy)`. **Say:** "Both services are running together."
+4. Open **http://localhost:8081**. The login page appears. **Say:** "The app is now running from Docker."
+
+> If building takes too long during the presentation, run `docker compose up -d --build` **before** the presentation starts and just show `docker compose ps`.
+
+---
+
+### Step 3: Short code tour (2 minutes)
+
+In IntelliJ, open the **Project** panel and show the folders. **Say** one line per folder:
+
+| Folder / file | What to say |
+|---|---|
+| `model/` | "Entities: each class is a database table: Admin, Teacher, Student (plus Course and Registration)." |
+| `repository/` | "Spring Data JPA repositories: I only write interfaces, and Spring makes the database code." |
+| `controller/` | "REST controllers: one per resource, with GET, POST, PUT and DELETE." |
+| `security/SecurityConfig.java` | "All security rules: login, logout, BCrypt, and which role may use which URL." |
+| `security/MyUserDetailsService.java` | "Loads the user at login from the table of the selected role." |
+| `application.properties` | "Port 8081 and the database settings." |
+
+---
+
+### Step 4: Requirement 1, REST API (3 minutes)
+
+1. Open **`TeacherController.java`** and point at:
+   - `@RestController` + `@RequestMapping("/api/teachers")` → "returns JSON, all URLs start with /api/teachers"
+   - `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping` → "the four CRUD operations"
+   - `ResponseEntity.status(HttpStatus.CREATED)`, `notFound()`, `noContent()` → "proper status codes"
+2. In **Postman**, open folder **"1. REST API"** and **Send** these one by one (or run the folder):
+
+| Request | Show the teacher |
+|---|---|
+| Teachers: GET all → 200 | the JSON list and **200 OK** |
+| Teachers: POST create → 201 | **201 Created**, the new JSON with its `id`, and **no password** in the answer |
+| Teachers: GET one → 200 | reading one record by id |
+| Teachers: PUT update → 200 | the changed `designation` |
+| Teachers: POST same username → 409 | **409 Conflict** + `{"error":"username already exists"}` |
+| Teachers: POST without password → 400 | **400 Bad Request** |
+| Teachers: DELETE → 204 | **204 No Content** |
+| Teachers: GET deleted one → 404 | **404 Not Found** |
+
+**Say:**
+> "Every resource follows REST conventions: the URL is the resource, the HTTP method is the action, the body is JSON, and every answer has the right status code. Admins and Students work the same way."
+> Then run the Admins and Students requests too (or run the whole folder: all PASS ✅).
+
+---
+
+### Step 5: Requirement 2, Spring Security (4 minutes)
+
+#### a) Login with role, and logout (browser)
+1. On the login page, choose **Login as: Teacher**, `teacher1` / `teacher123` → **Login**. The dashboard shows **"Logged in as teacher1 (TEACHER)"** and only the **Teachers** tab (plus Courses and Registrations).
+2. Click **Logout** → *"You have been logged out."*
+3. **Wrong role:** choose **Login as: Student**, `teacher1` / `teacher123` → *"Wrong username, password or role!"*.
+   **Say:** "The selected role decides which table is checked, so a teacher can't log in as a student."
+4. Show **`SecurityConfig.java`**: `formLogin(...)` (login) and `logout(...)` (logout).
+
+#### b) Password hashing
+1. Show **`SecurityConfig.java`** → `new BCryptPasswordEncoder()`, and **`TeacherController.java`** → `passwordEncoder.encode(...)` in `create`.
+2. Show the **hash in the database**:
+   - **Docker:**
+     ```
+     docker compose exec db mysql -uroot -proot university_db -e "SELECT username, password FROM teacher;"
+     ```
+   - **IntelliJ (H2)**, while the app is running, in IntelliJ's Terminal (PowerShell):
+     ```
+     java -cp "$env:USERPROFILE\.m2\repository\com\h2database\h2\2.2.224\h2-2.2.224.jar" org.h2.tools.Shell -url "jdbc:h2:file:./data/ums;AUTO_SERVER=TRUE" -user sa -sql "SELECT USERNAME, PASSWORD FROM TEACHER"
+     ```
+     (In CMD, write `%USERPROFILE%` instead of `$env:USERPROFILE`.)
+3. **Say:**
+   > "Passwords are stored as BCrypt hashes like `$2a$10$...`, never as plain text. BCrypt is one-way with a random salt. The password is also never sent back in JSON, because of `@JsonProperty(WRITE_ONLY)`."
+
+#### c) Role-based access control (RBAC)
+1. Show the rules in **`SecurityConfig.java`**:
+   ```java
+   .requestMatchers("/api/admins/**").hasRole("ADMIN")
+   .requestMatchers(HttpMethod.POST, "/api/teachers/**", "/api/students/**").hasRole("ADMIN")
+   .requestMatchers("/api/teachers/**").hasAnyRole("ADMIN", "TEACHER")
+   .requestMatchers("/api/students/**").hasAnyRole("ADMIN", "STUDENT")
+   ```
+   **Say:** "This is exactly the task's note: admin → all three, teacher → only teachers, student → only students."
+2. In **Postman**, run folder **"2. Spring Security"** (or Send one by one):
+
+| Request | Result | What it proves |
+|---|---|---|
+| No login → 401 | **401** | you must log in |
+| Wrong password → 401 | **401** | wrong passwords are rejected |
+| Teacher reads teachers → 200 | **200** | teacher → teachers ✅ |
+| Teacher reads students → 403 | **403** | teacher ✗ students |
+| Teacher reads admins → 403 | **403** | teacher ✗ admins |
+| Student reads students → 200 | **200** | student → students ✅ |
+| Student reads teachers / admins → 403 | **403** | student ✗ others |
+| Teacher creates a teacher → 403 | **403** | only the admin creates accounts |
+| Teacher edits OWN account → 200 | **200** | own account ✅ |
+| Teacher edits / deletes ANOTHER teacher → 403 | **403** | not someone else's ✗ |
+| Admin deletes OWN account → 400 | **400** | the admin can't remove themselves |
+
+3. **In the browser**, log in as **student1** and show: only the **Students** tab (plus Courses and My Registrations), every student is visible, but **Edit/Delete only on their own yellow row**.
+   **Say:**
+   > "There are two levels of security: `SecurityConfig` checks the **role** for each URL, and the controllers check that a teacher or student only changes **their own** record."
+
+---
+
+### Step 6: Extra, courses and registrations (1–2 minutes)
+
+In the browser:
+1. As **teacher1** → **Courses** → add a course (e.g. `CSE3210`, *Software Engineering*, 3, 3-2) → it appears **yellow** (yours).
+2. **Logout** → as **student1** → **Courses** → **Register** on CSE3210 → section `A` → **My Registrations** → **Edit** (change section) → **Drop**.
+3. As **teacher1** → **Registrations** → see the students in your courses.
+
+(Or run Postman folder **"3. Extra"**.)
+
+**Say:**
+> "To make teacher and student work realistic, teachers manage their own courses and students register for courses. The tables are linked with `@ManyToOne` foreign keys, and deleting a course also deletes its registrations."
+
+---
+
+### Step 7: Stop and summary (1 minute)
+
+```
+docker compose down
+```
+**Say:**
+> "To summarise: there is a REST API with CRUD for Admin, Teacher and Student, with JSON and correct status codes. Spring Security handles login, logout, BCrypt hashing and role-based access, so admin manages all, teacher only teachers, and student only students. And the app is containerized: a Dockerfile builds it, and Docker Compose runs it together with MySQL."
+
+---
+
+### 7.4 If something goes wrong during the demo
+
+| Problem | Quick fix |
+|---|---|
+| Docker build is slow or has no internet | Run the app from **IntelliJ** (▶) and only **show** the Dockerfile and compose.yaml. |
+| Port 8081 already in use | Stop the IntelliJ app or `docker compose down`. Only one of the two can run at a time. |
+| Postman request fails with 409 | The data from an earlier run still exists. Use fresh data (`docker compose down -v`, or delete `data/`), or just explain that 409 = already exists. |
+| Postman request fails with 404 on `{{demoTeacherId}}` | Run the folder **from the top**. Earlier requests save the ids. |
+| Login fails | Check the **Login as** role and the password (section 4). |
+
+### 7.5 Requirement checklist (show this if the teacher asks "where is X?")
+
+| Teacher asks... | Show this |
+|---|---|
+| "Where is CRUD?" | `controller/*Controller.java` → `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping` |
+| "Where are the status codes?" | `ResponseEntity.ok`, `status(HttpStatus.CREATED)`, `noContent()`, `notFound()`, `badRequest()`, `HttpStatus.CONFLICT`, `HttpStatus.FORBIDDEN` |
+| "Where is JSON?" | `@RestController` + `@RequestBody` (Jackson converts Java ↔ JSON automatically) |
+| "Where is login / logout?" | `SecurityConfig.java` → `formLogin(...)`, `httpBasic(...)`, `logout(...)` + `login.html` |
+| "Where is password hashing?" | `SecurityConfig.passwordEncoder()` → `BCryptPasswordEncoder`, `passwordEncoder.encode(...)` in the controllers, the hash in the database |
+| "Where is RBAC?" | `SecurityConfig.java` → `hasRole` / `hasAnyRole`; `MyUserDetailsService` → `.roles("TEACHER")`; controllers → `isAdmin(auth)` / own-account checks |
+| "Where is Docker?" | `Dockerfile`, `compose.yaml`, `docker compose ps` |
+| "How do the services talk?" | `compose.yaml` → `SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/...` (`db` = the service name) |
+
+---
+
+## 8. Project structure
 
 ```
 Software Lab-HW
@@ -307,15 +821,16 @@ Software Lab-HW
 ├── compose.yaml                         runs app + MySQL together
 ├── .dockerignore                        files Docker should not copy
 ├── .gitignore                           files Git should not save
+├── UMS.postman_collection.json          ready Postman requests for the presentation
 ├── README.md                            this file
-├── data/                                (made when the app runs) H2 database file
-├── target/                              (made when building) compiled code + ums.jar
+├── data/                                (created when the app runs in IntelliJ) H2 database file
+├── target/                              (created when building) compiled code + ums.jar
 └── src/main
     ├── java/com/university/ums
     │   ├── UmsApplication.java          ▶ starting point of the app
     │   ├── DataLoader.java              creates the sample data
     │   │
-    │   ├── model/                       DATABASE TABLES
+    │   ├── model/                       DATABASE TABLES (entities)
     │   │   ├── Admin.java
     │   │   ├── Teacher.java
     │   │   ├── Student.java
@@ -338,7 +853,7 @@ Software Lab-HW
     │   │   └── MeController.java            /api/me
     │   │
     │   └── security/                    LOGIN + ROLES
-    │       ├── SecurityConfig.java      who can open which URL, login, logout, BCrypt
+    │       ├── SecurityConfig.java      URL rules, login, logout, BCrypt
     │       └── MyUserDetailsService.java   finds the user at login
     │
     └── resources
@@ -350,7 +865,27 @@ Software Lab-HW
             └── style.css                simple design for both pages
 ```
 
-### Database tables and how they connect
+### 8.1 The layers (how the code is organized)
+
+```
+  Browser / Postman
+        │  HTTP + JSON
+        ▼
+  ┌─────────────────────┐
+  │ Spring Security     │  security/   → logged in? right role?
+  ├─────────────────────┤
+  │ Controllers         │  controller/ → URLs, checks, status codes
+  ├─────────────────────┤
+  │ Repositories        │  repository/ → save / find / delete
+  ├─────────────────────┤
+  │ Entities            │  model/      → the tables
+  └─────────────────────┘
+        │  JDBC
+        ▼
+  Database (H2 in IntelliJ, MySQL in Docker)
+```
+
+### 8.2 Database tables and how they connect
 
 ```
  admin            teacher                 student
@@ -372,15 +907,13 @@ Software Lab-HW
                   semester   │
                   teacher_id─┘
 ```
+- One teacher → **many** courses (`course.teacher_id`).
+- One course → **many** registrations, and one student → **many** registrations.
+- These links are **foreign keys** with **ON DELETE CASCADE**: deleting the "one" side deletes the "many" rows automatically.
 
-- One teacher has **many** courses (`course.teacher_id`).
-- One course has **many** registrations, and one student has **many** registrations (`registration.course_id`, `registration.student_id`).
-- These links are **foreign keys** with **ON DELETE CASCADE**: deleting the "one" side automatically deletes the "many" rows.
-
-### How one request travels through the app
+### 8.3 How one request travels through the app
 
 Example: **teacher1 edits their own course** and clicks **Save**.
-
 ```
 Browser (app.js)
    │  PUT /api/courses/1   {"code":"CSE3230","title":"...","credit":"1.5","semester":"3-2"}
@@ -398,28 +931,28 @@ CourseController.update()                       ← 2nd check: the OWNER
    ▼
 CourseRepository.save()
    ▼
-Database (H2 in IntelliJ, MySQL in Docker)  → UPDATE course ... WHERE id = 1
+Database  → UPDATE course ... WHERE id = 1
    ▼
 Response: 200 OK + the course as JSON → app.js shows "Updated successfully" and reloads the table
 ```
 
 ---
 
-## 7. Spring Boot basics (for viva)
+## 9. Spring Boot basics
 
-### What is Spring Boot?
+### 9.1 What is Spring Boot?
 - **Spring** is a big Java framework for making web applications.
 - **Spring Boot** is Spring with **ready-made settings**. You add "starter" libraries (web, security, JPA) and they work with almost no setup.
 - It has a **web server (Tomcat) built in**. Running the `main` method starts a website.
 
-### How is a Spring Boot project created?
+### 9.2 How is a Spring Boot project created?
 1. Go to **https://start.spring.io** (Spring Initializr).
 2. Choose **Maven**, **Java**, Spring Boot **3.x**, Java **17**, Packaging **Jar**.
-3. Fill in Group `com.university` and Artifact `ums`.
+3. Group `com.university`, Artifact `ums`.
 4. **Add dependencies:** Spring Web, Spring Data JPA, Spring Security, H2 Database, MySQL Driver.
-5. Click **Generate**, unzip the file, and open the folder in IntelliJ (*File → Open*).
+5. **Generate** → unzip → open the folder in IntelliJ (*File → Open*).
 
-### Which files does Spring Initializr create automatically?
+### 9.3 Which files are created automatically?
 
 | File | What it is |
 |---|---|
@@ -432,85 +965,80 @@ Response: 200 OK + the course as JSON → app.js shows "Updated successfully" an
 | `mvnw`, `mvnw.cmd`, `.mvn/` | The Maven Wrapper. We removed it, because IntelliJ has Maven built in. |
 | `.gitignore`, `HELP.md` | Git settings and help links. |
 
-**Everything else we wrote ourselves:** `DataLoader`, the `model`, `repository`, `controller` and `security` folders, the 4 web files, `Dockerfile`, `compose.yaml`, `.dockerignore` and this README.
+**Everything else was written for this project:** `DataLoader`, the `model`, `repository`, `controller` and `security` folders, the 4 web files, `Dockerfile`, `compose.yaml`, `.dockerignore`, the Postman collection and this README.
 
-### "Which file runs first / automatically?"
-**`UmsApplication.java`**, the class with `@SpringBootApplication` and the `main()` method. When you run it, Spring Boot **automatically**:
+### 9.4 "Which file runs first / automatically?"
+**`UmsApplication.java`** (`@SpringBootApplication` + `main()`). When it runs, Spring Boot **automatically**:
 1. loads **`application.properties`**,
-2. **scans** the `com.university.ums` package and its sub-packages, and creates every `@RestController`, `@Service`, `@Component`, `@Configuration` and repository,
+2. **scans** `com.university.ums` and its sub-packages, and creates every `@RestController`, `@Service`, `@Component`, `@Configuration` and repository,
 3. connects to the **database** and **creates the tables** from the `@Entity` classes,
-4. runs **`DataLoader`**, which creates the sample data,
+4. runs **`DataLoader`**, which adds the sample data,
 5. starts **Tomcat** on port **8081**,
-6. shows **`static/index.html`** when someone opens `http://localhost:8081/`. Because of security, someone who isn't logged in is sent to `login.html` first.
+6. serves **`static/index.html`** at `http://localhost:8081/`. Because of security, someone who isn't logged in is sent to `login.html` first.
 
 ---
 
-## 8. Every file explained line by line
+## 10. Every file explained line by line
 
-### 8.1 `pom.xml`
-
-The Maven file: what the project is and which libraries it needs.
+### 10.1 `pom.xml`
 
 | Line(s) | Meaning |
 |---|---|
 | `<?xml version="1.0" encoding="UTF-8"?>` | This is an XML file. |
 | `<project xmlns=...>` | The root tag of every Maven project. The `xmlns` parts are fixed boilerplate. |
 | `<modelVersion>4.0.0</modelVersion>` | The POM format version. It is always 4.0.0. |
-| `<parent> spring-boot-starter-parent 3.3.5 </parent>` | Use Spring Boot 3.3.5's default settings, so we don't need to write a version for every library. |
+| `<parent> spring-boot-starter-parent 3.3.5 </parent>` | Use Spring Boot 3.3.5's default settings, so we don't need versions for each library. |
 | `<groupId>com.university</groupId>` | The organisation name. |
-| `<artifactId>ums</artifactId>` | The project name (University Management System). |
+| `<artifactId>ums</artifactId>` | The project name. |
 | `<version>1.0</version>` | Our version. |
 | `<name>University Management System</name>` | A readable name. |
 | `<java.version>17</java.version>` | Use Java 17. |
 | `spring-boot-starter-web` | Web server (Tomcat) + REST API + JSON (Jackson). |
-| `spring-boot-starter-data-jpa` | Work with the database using Java classes (Hibernate) instead of SQL. |
+| `spring-boot-starter-data-jpa` | Database work with Java classes (Hibernate) instead of SQL. |
 | `spring-boot-starter-security` | Login, logout, password hashing, roles. |
-| `h2` (scope `runtime`) | The small file database used when running in IntelliJ. `runtime` = only needed when the app runs, not when compiling. |
-| `mysql-connector-j` (scope `runtime`) | The MySQL driver, used when running in Docker. |
-| `<finalName>ums</finalName>` | The built file is named `target/ums.jar`. The Dockerfile uses this name. |
-| `spring-boot-maven-plugin` | Builds one runnable jar with all libraries inside (`java -jar ums.jar`). |
+| `h2` (scope `runtime`) | The file database used in IntelliJ. `runtime` = only needed when the app runs. |
+| `mysql-connector-j` (scope `runtime`) | The MySQL driver, used in Docker. |
+| `<finalName>ums</finalName>` | The built file is named `target/ums.jar` (the Dockerfile uses this name). |
+| `spring-boot-maven-plugin` | Builds one runnable jar with all libraries inside. |
 
 ---
 
-### 8.2 `UmsApplication.java`
+### 10.2 `UmsApplication.java`
 
 ```java
 package com.university.ums;
-```
-The package (folder) of this class.
 
-```java
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-```
-Imports the two Spring Boot classes we use.
 
-```java
 @SpringBootApplication
-```
-Marks the **main class**. It turns on auto-configuration and scanning of this package and its sub-packages.
-
-```java
 public class UmsApplication {
+
     public static void main(String[] args) {
         SpringApplication.run(UmsApplication.class, args);
     }
 }
 ```
-The Java `main` method, where the program starts. `SpringApplication.run(...)` starts everything: Spring, the database, Tomcat on port 8081.
+| Line | Meaning |
+|---|---|
+| `package com.university.ums;` | The package (folder) of this class. |
+| `import ...` | The two Spring Boot classes we use. |
+| `@SpringBootApplication` | Marks the **main class**: auto-configuration + scanning of this package and its sub-packages. |
+| `public static void main(String[] args)` | The Java starting point. |
+| `SpringApplication.run(UmsApplication.class, args);` | Starts everything: Spring, the database, Tomcat on port 8081. |
 
 ---
 
-### 8.3 `DataLoader.java`
+### 10.3 `DataLoader.java`
 
-It creates the sample data so you can log in and test right away.
+Creates the sample data so you can log in right away.
 
 ```java
 // runs once when the app starts and adds sample data (only into empty tables)
 @Component
 public class DataLoader implements CommandLineRunner {
 ```
-`@Component` tells Spring to create this class. A class that implements **`CommandLineRunner`** has a `run` method that Spring calls **once, right after the app has started**.
+`@Component` = Spring creates this class. **`CommandLineRunner`** = Spring calls its `run` method **once, right after start-up**.
 
 ```java
     private final AdminRepository adminRepository;
@@ -521,7 +1049,7 @@ public class DataLoader implements CommandLineRunner {
         ...
     }
 ```
-**Constructor injection:** Spring passes in the 5 repositories and the password encoder, and we keep them in fields.
+**Constructor injection:** Spring passes in the 5 repositories and the password encoder.
 
 ```java
     @Override
@@ -535,7 +1063,7 @@ public class DataLoader implements CommandLineRunner {
             adminRepository.save(admin);
         }
 ```
-`count()` is the number of rows. If there are **no admins**, make one. **Hash the password** with `encode(...)` and save it (INSERT). The same blocks follow for `teacher1` and `student1`.
+`count()` = the number of rows. If there are **no admins**, create one with a **hashed password** (`encode`), and `save` it (INSERT). The same blocks follow for `teacher1` and `student1`.
 
 ```java
         // two courses of teacher1
@@ -545,7 +1073,7 @@ public class DataLoader implements CommandLineRunner {
             courseRepository.save(newCourse("CSE3201", "Operating Systems", 3.0, "3-2", teacher1.get()));
         }
 ```
-Find `teacher1`. If there are no courses yet and teacher1 exists, save two courses that belong to teacher1.
+If there are no courses and teacher1 exists, create two courses taught by teacher1.
 
 ```java
         // student1 registered in CSE3230
@@ -560,26 +1088,26 @@ Find `teacher1`. If there are no courses yet and teacher1 exists, save two cours
         }
     }
 ```
-If there are no registrations, and student1 and CSE3230 exist, register student1 in CSE3230, section A.
+If there are no registrations, register student1 in CSE3230, section A.
 
 ```java
     private Course newCourse(String code, String title, Double credit, String semester, Teacher teacher) {
         Course course = new Course();
         course.setCode(code);
-        ...
+        course.setTitle(title);
+        course.setCredit(credit);
+        course.setSemester(semester);
         course.setTeacher(teacher);
         return course;
     }
 ```
-A small helper that builds a Course object, so the two lines above stay short.
+A small helper that builds a Course object.
 
 ---
 
-### 8.4 `model/Admin.java`, `model/Teacher.java`, `model/Student.java`
+### 10.4 `model/Admin.java`, `Teacher.java`, `Student.java`
 
-A **model** (or **entity**) is a Java class that becomes a **database table**. Each object is one **row**, and each field is one **column**.
-
-Here is `Admin.java` line by line:
+A **model** (entity) is a Java class that becomes a **database table**: each object is a **row**, each field is a **column**. Here is `Admin.java`:
 
 ```java
 package com.university.ums.model;
@@ -591,20 +1119,20 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 ```
-`jakarta.persistence.*` are the JPA (database) annotations. `JsonProperty` comes from Jackson, the JSON library.
+`jakarta.persistence.*` = the JPA (database) annotations. `JsonProperty` comes from Jackson (JSON).
 
 ```java
 @Entity
 public class Admin {
 ```
-**`@Entity`** creates a table named `admin` for this class.
+**`@Entity`** → a table named `admin`.
 
 ```java
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 ```
-`@Id` makes `id` the **primary key**. `@GeneratedValue(IDENTITY)` makes the database give each new row the next number automatically (1, 2, 3...).
+`@Id` = **primary key**. `IDENTITY` = the database numbers new rows automatically (1, 2, 3...).
 
 ```java
     private String name;
@@ -617,20 +1145,20 @@ Normal columns.
     @Column(unique = true)
     private String username;
 ```
-`unique = true` means two admins can't have the same username.
+`unique = true` = no two admins with the same username.
 
 ```java
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 ```
-The password column, which stores the BCrypt **hash**. `WRITE_ONLY` means the password can be **received** in JSON (create or update) but is **never sent back** in a response.
+Holds the BCrypt **hash**. `WRITE_ONLY` = the password can be **received** in JSON but is **never sent back**.
 
 ```java
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     ... getName/setName, getEmail/setEmail, getUsername/setUsername, getPassword/setPassword
 ```
-**Getters and setters.** The fields are private, so other code reads them with `getX()` and changes them with `setX(...)`. Spring (JPA and Jackson) uses these methods too.
+**Getters and setters**: read and change the private fields. JPA and Jackson use them too.
 
 | Model | Table | Fields |
 |---|---|---|
@@ -640,7 +1168,7 @@ The password column, which stores the BCrypt **hash**. `WRITE_ONLY` means the pa
 
 ---
 
-### 8.5 `model/Course.java`
+### 10.5 `model/Course.java`
 
 ```java
 @Entity
@@ -649,23 +1177,17 @@ public class Course {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-```
-The table `course` with an automatic id (the same as above).
 
-```java
     @Column(unique = true)
     private String code;
-```
-The course code, like `CSE3230`. It is unique: two courses can't have the same code.
 
-```java
     private String title;
 
     private Double credit;
 
     private String semester;
 ```
-The title, the credit (`Double`, so `1.5` works) and the semester, like `3-2`.
+The table `course`: id, a **unique** code (e.g. `CSE3230`), the title, the credit (`Double`, so `1.5` works) and the semester (e.g. `3-2`).
 
 ```java
     // the teacher of this course (when the teacher is deleted, their courses are deleted too)
@@ -673,15 +1195,15 @@ The title, the credit (`Double`, so `1.5` works) and the semester, like `3-2`.
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Teacher teacher;
 ```
-- **`@ManyToOne`**: **many** courses can belong to **one** teacher. In the database this becomes the column `teacher_id`, a **foreign key** to the `teacher` table.
-- **`@OnDelete(action = OnDeleteAction.CASCADE)`**: the database gets `ON DELETE CASCADE`, so if the teacher row is deleted, the database deletes their courses automatically.
-- In JSON, the course contains the whole teacher object: `"teacher": {"id":1, "name":"Rahim Uddin", ...}` (no password).
+- **`@ManyToOne`**: **many** courses → **one** teacher. This becomes the column `teacher_id`, a **foreign key** to `teacher`.
+- **`@OnDelete(CASCADE)`**: the database gets `ON DELETE CASCADE`, so deleting a teacher deletes their courses.
+- In JSON, the course contains the whole teacher object (without the password).
 
-After the fields come the getters and setters for id, code, title, credit, semester and teacher.
+Then come the getters and setters.
 
 ---
 
-### 8.6 `model/Registration.java`
+### 10.6 `model/Registration.java`
 
 ```java
 // a student registered in a course
@@ -691,59 +1213,48 @@ public class Registration {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-```
-The table `registration` with an automatic id.
 
-```java
     // when the student is deleted, their registrations are deleted too
     @ManyToOne
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Student student;
-```
-**Which student.** Many registrations belong to one student, stored as the column `student_id`. If the student is deleted, their registrations are deleted.
 
-```java
     // when the course is deleted, its registrations are deleted too
     @ManyToOne
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Course course;
-```
-**Which course.** Many registrations belong to one course, stored as the column `course_id`. If the course is deleted, its registrations are deleted.
 
-```java
     private String section;
 ```
-The section, like `A` or `B`.
+The table `registration`:
+- `student_id` → which student (many registrations → one student),
+- `course_id` → which course (many registrations → one course),
+- `section` (e.g. `A`).
 
-Then come the getters and setters.
+Deleting the student or the course deletes the registration (CASCADE). Then come the getters and setters.
 
 ---
 
-### 8.7 The repositories
+### 10.7 The repositories
 
-A **repository** is how we talk to the database. We only write an **interface**, and Spring writes the real code.
+A **repository** = database access. We write only an **interface**, and Spring writes the code.
 
-#### `AdminRepository.java` (Teacher and Student are the same)
-
+**`AdminRepository.java`** (Teacher and Student are the same):
 ```java
 public interface AdminRepository extends JpaRepository<Admin, Long> {
-```
-`JpaRepository<Admin, Long>`: `Admin` is the entity and `Long` is the type of its id. This gives us these methods **for free**:
-`findAll()`, `findById(id)`, `save(obj)`, `deleteById(id)`, `existsById(id)`, `count()`.
 
-```java
     Optional<Admin> findByUsername(String username);
-```
-Spring reads the **method name** and builds the SQL itself: `SELECT * FROM admin WHERE username = ?`. `Optional` means "maybe found, maybe not". It is used at login.
 
-```java
     boolean existsByUsername(String username);
 }
 ```
-Returns `true` if the username is already taken. It is used for the 409 error.
+| Line | Meaning |
+|---|---|
+| `extends JpaRepository<Admin, Long>` | For entity `Admin` with an id of type `Long`, we get `findAll()`, `findById(id)`, `save(obj)`, `deleteById(id)`, `existsById(id)` and `count()` **for free**. |
+| `findByUsername` | Spring reads the **method name** and builds `SELECT * FROM admin WHERE username = ?`. `Optional` = maybe found, maybe not. Used at login. |
+| `existsByUsername` | `true` if the username is taken → used for 409. |
 
-#### `CourseRepository.java`
-
+**`CourseRepository.java`:**
 ```java
 public interface CourseRepository extends JpaRepository<Course, Long> {
 
@@ -752,32 +1263,29 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     boolean existsByCode(String code);
 }
 ```
-Find a course by its code (`WHERE code = ?`), and check whether a code is already used.
+Find a course by its code, and check whether a code is already used.
 
-#### `RegistrationRepository.java`
-
+**`RegistrationRepository.java`:**
 ```java
     // registrations of one student
     List<Registration> findByStudentUsername(String username);
-```
-The name means "find by **student** → **username**". Spring follows the link from registration to student, like `WHERE student.username = ?`. It is used for **My Registrations**.
 
-```java
     // registrations in the courses of one teacher
     List<Registration> findByCourseTeacherUsername(String username);
-```
-"find by **course** → **teacher** → **username**": it follows two links, registration → course → teacher. It is used for **Registrations in My Courses**.
 
-```java
     boolean existsByStudentAndCourse(Student student, Course course);
 ```
-Is this student already registered in this course? It is used for the 409 error.
+| Method | Meaning |
+|---|---|
+| `findByStudentUsername` | Follows registration → **student** → **username**. Used for "My Registrations". |
+| `findByCourseTeacherUsername` | Follows registration → **course** → **teacher** → **username**. Used for "Registrations in My Courses". |
+| `existsByStudentAndCourse` | Is this student already in this course? → 409. |
 
 ---
 
-### 8.8 `controller/AdminController.java` (and Teacher / Student)
+### 10.8 `controller/AdminController.java`
 
-A **controller** receives HTTP requests and returns responses. **This is the REST API.** The three people controllers are almost the same: they differ in the class names, in the fields they copy in `update`, and in the "own account only" rule for teachers and students (8.9). Here is `AdminController` line by line.
+A **controller** receives HTTP requests and returns responses. **This is the REST API.**
 
 ```java
 package com.university.ums.controller;
@@ -794,14 +1302,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 ```
-Imports. `web.bind.annotation.*` gives `@RestController`, `@GetMapping`, `@PostMapping` and the other annotations.
+Imports. `web.bind.annotation.*` gives `@RestController`, `@GetMapping` and the other annotations.
 
 ```java
 @RestController
 @RequestMapping("/api/admins")
 public class AdminController {
 ```
-`@RestController`: every method returns **data, which is turned into JSON automatically**. `@RequestMapping("/api/admins")`: every URL in this class starts with `/api/admins`.
+`@RestController` = methods return **data → JSON automatically**. `@RequestMapping("/api/admins")` = every URL here starts with `/api/admins`.
 
 ```java
     private final AdminRepository adminRepository;
@@ -822,7 +1330,7 @@ Constructor injection: Spring passes in the repository and the BCrypt encoder.
         return adminRepository.findAll();
     }
 ```
-Returns every admin as a JSON array with **200 OK**.
+All admins as a JSON array → **200 OK**.
 
 #### READ one: `GET /api/admins/{id}`
 ```java
@@ -836,39 +1344,33 @@ Returns every admin as a JSON array with **200 OK**.
         return ResponseEntity.ok(admin.get());
     }
 ```
-`{id}` is a value in the URL, and `@PathVariable` puts it into `id`. `ResponseEntity` lets us choose the status: not found → **404**, found → **200** with the admin.
+`@PathVariable` takes `{id}` from the URL (`/api/admins/5` → 5). `ResponseEntity` lets us choose the status: **404** if missing, **200** + the admin if found.
 
 #### CREATE: `POST /api/admins`
 ```java
     // CREATE -> 201, 400 or 409
     @PostMapping
     public ResponseEntity<?> create(@RequestBody Admin admin) {
-```
-`@RequestBody` turns the JSON in the request into an `Admin` object. `<?>` = the body can be an Admin or an error message.
-
-```java
         if (isBlank(admin.getName()) || isBlank(admin.getUsername()) || isBlank(admin.getPassword())) {
             return ResponseEntity.badRequest().body(Map.of("error", "name, username and password are required"));
         }
-```
-Missing name, username or password → **400 Bad Request** with `{"error": "..."}`.
-
-```java
         if (adminRepository.existsByUsername(admin.getUsername())) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "username already exists"));
         }
-```
-Username already taken → **409 Conflict**.
-
-```java
         admin.setId(null);
         admin.setPassword(passwordEncoder.encode(admin.getPassword()));
         return ResponseEntity.status(HttpStatus.CREATED).body(adminRepository.save(admin));
     }
 ```
-- `setId(null)`: ignore any id that was sent, so the database makes a new one. That way nobody can overwrite an old row with POST.
-- `encode`: **hash the password** with BCrypt.
-- Save the new row (INSERT) and return **201 Created**.
+| Line | Meaning |
+|---|---|
+| `@RequestBody Admin admin` | Turns the JSON body into an `Admin` object. |
+| `ResponseEntity<?>` | The answer can be an Admin or an error message. |
+| `if (isBlank(...))` → `badRequest()` | Missing name, username or password → **400** + `{"error": "..."}`. |
+| `existsByUsername` → `CONFLICT` | Username taken → **409**. |
+| `admin.setId(null);` | Ignore any id that was sent, so the database makes a new one. |
+| `passwordEncoder.encode(...)` | **Hash the password** with BCrypt. |
+| `status(HttpStatus.CREATED).body(save(...))` | Save (INSERT) → **201 Created** + the new admin. |
 
 #### UPDATE: `PUT /api/admins/{id}`
 ```java
@@ -882,18 +1384,10 @@ Username already taken → **409 Conflict**.
         if (isBlank(newData.getName()) || isBlank(newData.getUsername())) {
             return ResponseEntity.badRequest().body(Map.of("error", "name and username are required"));
         }
-```
-The id comes from the URL and the new values from the JSON. No such admin → **404**. Empty name or username → **400**. The password *may* be empty here, which means "keep the old one".
-
-```java
         Admin admin = found.get();
         if (!admin.getUsername().equals(newData.getUsername()) && adminRepository.existsByUsername(newData.getUsername())) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "username already exists"));
         }
-```
-Username **changed** to one that someone else has → **409**.
-
-```java
         admin.setName(newData.getName());
         admin.setEmail(newData.getEmail());
         admin.setUsername(newData.getUsername());
@@ -903,17 +1397,20 @@ Username **changed** to one that someone else has → **409**.
         return ResponseEntity.ok(adminRepository.save(admin));
     }
 ```
-Copy the new values. Change the password **only if a new one was typed**, and hash it. `save` on a row that already has an id does an **UPDATE** → **200 OK**.
+| Step | Meaning |
+|---|---|
+| `findById` → `notFound()` | No such admin → **404**. |
+| `isBlank(name / username)` | Empty → **400**. (The password *may* be empty, which means "keep the old one".) |
+| Username changed and taken | → **409**. |
+| `setName / setEmail / setUsername` | Copy the new values. |
+| `if (!isBlank(password)) encode` | Change the password only if a new one was typed, and hash it. |
+| `ok(save(admin))` | `save` on an existing id = **UPDATE** → **200 OK**. |
 
 #### DELETE: `DELETE /api/admins/{id}`
 ```java
     // DELETE -> 204, 400 or 404  (an admin cannot delete their own account)
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id, Authentication auth) {
-```
-**`Authentication auth`**: Spring passes in the **logged-in user**. `auth.getName()` is their username.
-
-```java
         Optional<Admin> found = adminRepository.findById(id);
         if (found.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -925,21 +1422,20 @@ Copy the new values. Change the password **only if a new one was typed**, and ha
         return ResponseEntity.noContent().build();
     }
 ```
-Not found → **404**. If the admin tries to delete **themselves** → **400**, so the system doesn't lose the admin who is using it. Otherwise delete → **204 No Content**.
+`Authentication auth` = **the logged-in user** (Spring passes it in), and `auth.getName()` = their username. Missing → **404**. Deleting yourself → **400**, so the system doesn't lose the admin who is using it. Otherwise delete → **204 No Content**.
 
-#### Helper
 ```java
     private boolean isBlank(String text) {
         return text == null || text.isBlank();
     }
 ```
-`true` if the text is missing (`null`) or only spaces.
+`true` if the text is missing or only spaces.
 
 ---
 
-### 8.9 `TeacherController` and `StudentController`: the "own account only" rule
+### 10.9 `TeacherController.java` and `StudentController.java`
 
-They are the same as `AdminController` (with their own fields), plus one rule: a teacher may only **edit or delete their own** account (a student: their own). The admin may change anyone. Here is `TeacherController`; `StudentController` is the same with `Student`.
+They are the same as `AdminController` (URL `/api/teachers` or `/api/students`, with their own fields), plus the **"own account only"** rule. Here is `TeacherController`:
 
 ```java
     // UPDATE -> 200, 400, 403, 404 or 409  (a teacher can only update their own account)
@@ -953,8 +1449,10 @@ They are the same as `AdminController` (with their own fields), plus one rule: a
         if (!isAdmin(auth) && !teacher.getUsername().equals(auth.getName())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "you can only edit your own account"));
         }
+        ... (the same 400 / 409 checks, copy name, email, department, designation, username, password)
+    }
 ```
-**The ownership check:** if the user is **not an admin** and the record's username is **not theirs** → **403 Forbidden**. After this, `update` works like the admin version, copying `department` and `designation` too (students: `roll` and `department`).
+**The ownership check:** not an admin **and** not your own record → **403 Forbidden**. `StudentController` copies `roll` and `department` instead.
 
 ```java
     // DELETE -> 204, 403 or 404  (a teacher can only delete their own account)
@@ -971,20 +1469,20 @@ They are the same as `AdminController` (with their own fields), plus one rule: a
         return ResponseEntity.noContent().build();
     }
 ```
-The same check for delete. Deleting a teacher also deletes their courses (CASCADE).
+The same check for delete.
 
 ```java
     private boolean isAdmin(Authentication auth) {
         return auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
     }
 ```
-`true` if the logged-in user has the role `ROLE_ADMIN`. `getAuthorities()` is the user's list of roles, and `anyMatch` checks whether any of them is `ROLE_ADMIN`.
+`getAuthorities()` = the user's roles. `anyMatch(... "ROLE_ADMIN")` = is one of them ADMIN?
 
-There is no ownership check in `create` (POST), because `SecurityConfig` already allows **only the admin** to POST teachers and students.
+There is no ownership check in `create`, because `SecurityConfig` lets **only the admin** POST teachers and students.
 
 ---
 
-### 8.10 `controller/CourseController.java`
+### 10.10 `controller/CourseController.java`
 
 ```java
 @RestController
@@ -994,7 +1492,7 @@ public class CourseController {
     private final CourseRepository courseRepository;
     private final TeacherRepository teacherRepository;
 ```
-URLs start with `/api/courses`. It needs the course repository, plus the teacher repository to find the course's teacher.
+URLs start with `/api/courses`. It needs the teacher repository to find a course's teacher.
 
 ```java
     // READ all -> 200  (everyone can see all courses)
@@ -1002,16 +1500,11 @@ URLs start with `/api/courses`. It needs the course repository, plus the teacher
     public List<Course> getAll() {
         return courseRepository.findAll();
     }
-
-    // READ one -> 200 or 404
-    @GetMapping("/{id}")
-    public ResponseEntity<Course> getOne(@PathVariable Long id) { ... }
 ```
-Read all or one course, the same as before.
+All courses. `getOne` works like before (200 / 404).
 
-#### CREATE: `POST /api/courses`
+**CREATE:**
 ```java
-    // CREATE -> 201, 400 or 409  (a teacher's new course is their own, the admin chooses the teacher)
     @PostMapping
     public ResponseEntity<?> create(@RequestBody Course course, Authentication auth) {
         if (isBlank(course.getCode()) || isBlank(course.getTitle())) {
@@ -1020,10 +1513,6 @@ Read all or one course, the same as before.
         if (courseRepository.existsByCode(course.getCode())) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "course code already exists"));
         }
-```
-Code and title are required → **400**. The code must be new → **409**.
-
-```java
         Optional<Teacher> teacher = findTeacher(course, auth);
         if (teacher.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "teacher not found"));
@@ -1033,18 +1522,15 @@ Code and title are required → **400**. The code must be new → **409**.
         return ResponseEntity.status(HttpStatus.CREATED).body(courseRepository.save(course));
     }
 ```
-Find **who teaches** the course (see `findTeacher` below). If no teacher is found → **400**. Otherwise set the teacher, save, and return **201**.
+Code and title are required (**400**), and the code must be new (**409**). Find the teacher (**400** if not found), link them, save → **201**.
 
-#### UPDATE: `PUT /api/courses/{id}`
+**UPDATE:**
 ```java
         Course course = found.get();
         if (!isAdmin(auth) && !course.getTeacher().getUsername().equals(auth.getName())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "you can only edit your own courses"));
         }
-```
-After the 404 check comes the **ownership check**: a teacher can only edit a course whose teacher is **themselves** → otherwise **403**.
-
-```java
+        ... 400 / 409 checks ...
         // only the admin can give the course to another teacher
         if (isAdmin(auth) && newData.getTeacher() != null) {
             Optional<Teacher> teacher = findTeacher(newData, auth);
@@ -1059,19 +1545,10 @@ After the 404 check comes the **ownership check**: a teacher can only edit a cou
         course.setSemester(newData.getSemester());
         return ResponseEntity.ok(courseRepository.save(course));
 ```
-The 400 and 409 checks come first, the same as in create. Only the **admin** can move a course to another teacher. Then copy the values and save → **200**.
+A teacher can only edit **their own** course (**403**). Only the admin may change the teacher. Copy the values → **200**.
 
-#### DELETE: `DELETE /api/courses/{id}`
-```java
-        if (!isAdmin(auth) && !found.get().getTeacher().getUsername().equals(auth.getName())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "you can only delete your own courses"));
-        }
-        courseRepository.deleteById(id);
-        return ResponseEntity.noContent().build();
-```
-Only the admin or the course's own teacher can delete it → **204**. Its registrations are deleted too (CASCADE).
+**DELETE:** the same ownership check (**403**), then delete → **204**. Its registrations are deleted too (CASCADE).
 
-#### `findTeacher(...)`
 ```java
     // the admin chooses the teacher by username, a teacher is always the teacher of their own course
     private Optional<Teacher> findTeacher(Course data, Authentication auth) {
@@ -1084,27 +1561,21 @@ Only the admin or the course's own teacher can delete it → **204**. Its regist
         return teacherRepository.findByUsername(data.getTeacher().getUsername());
     }
 ```
-- **Teacher:** the teacher is **the logged-in teacher**. Whatever was sent in JSON is ignored, so a teacher can't create a course for someone else.
-- **Admin:** use the username from the JSON, `"teacher": {"username": "teacher1"}`.
+A **teacher** is always the teacher of their new course (anything they send is ignored). The **admin** sends `"teacher": {"username": "..."}`.
 
 ---
 
-### 8.11 `controller/RegistrationController.java`
+### 10.11 `controller/RegistrationController.java`
 
 ```java
 @RestController
 @RequestMapping("/api/registrations")
 public class RegistrationController {
-
-    private final RegistrationRepository registrationRepository;
-    private final CourseRepository courseRepository;
-    private final StudentRepository studentRepository;
 ```
-URLs start with `/api/registrations`. It needs three repositories.
+URLs start with `/api/registrations`. It needs the registration, course and student repositories.
 
-#### READ all: different for each role
+**READ all: different data for each role**
 ```java
-    // READ all -> 200  (admin: all, teacher: registrations in their courses, student: their own)
     @GetMapping
     public List<Registration> getAll(Authentication auth) {
         if (hasRole(auth, "ADMIN")) {
@@ -1116,28 +1587,15 @@ URLs start with `/api/registrations`. It needs three repositories.
         return registrationRepository.findByStudentUsername(auth.getName());
     }
 ```
-The same URL gives **different data for each role**:
-- the admin gets everything,
-- a teacher gets the registrations in **their** courses,
-- a student gets **their own**.
+Admin → all. Teacher → in **their** courses. Student → **their own**.
 
-#### READ one
-```java
-        if (!canSee(registration.get(), auth)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "this is not your registration"));
-        }
-```
-After the 404 check: if you may not see it → **403**. `canSee` uses the same rules as the list.
+**READ one:** 404 if missing, **403** if `canSee(...)` is false ("this is not your registration").
 
-#### CREATE: register for a course
+**CREATE: register for a course**
 ```java
         if (isBlank(registration.getSection())) {
             return ResponseEntity.badRequest().body(Map.of("error", "section is required"));
         }
-```
-A section is required → **400**.
-
-```java
         Optional<Course> course = Optional.empty();
         if (registration.getCourse() != null) {
             course = courseRepository.findByCode(registration.getCourse().getCode());
@@ -1145,18 +1603,10 @@ A section is required → **400**.
         if (course.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "course not found"));
         }
-```
-Find the course by the code sent in JSON, `"course": {"code": "CSE3230"}`. No such course → **400**.
-
-```java
         Optional<Student> student = findStudent(registration, auth);
         if (student.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "student not found"));
         }
-```
-Find the student: a student registers **themselves**, and the admin sends `"student": {"username": "..."}` (see `findStudent`).
-
-```java
         if (registrationRepository.existsByStudentAndCourse(student.get(), course.get())) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "already registered in this course"));
         }
@@ -1165,62 +1615,37 @@ Find the student: a student registers **themselves**, and the admin sends `"stud
         registration.setStudent(student.get());
         return ResponseEntity.status(HttpStatus.CREATED).body(registrationRepository.save(registration));
 ```
-Already registered in this course → **409**. Otherwise link the course and student, save → **201**.
+- A section is required → **400**.
+- Find the course by its **code** → **400** if not found.
+- Find the student (a student = themselves, the admin = by username) → **400** if not found.
+- Already registered → **409**.
+- Otherwise link and save → **201**.
 
-#### UPDATE: change the section
+**UPDATE: change the section only**
 ```java
-        Registration registration = found.get();
         if (!isOwnerOrAdmin(registration, auth)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "you can only change your own registrations"));
         }
-        if (isBlank(newData.getSection())) {
-            return ResponseEntity.badRequest().body(Map.of("error", "section is required"));
-        }
+        if (isBlank(newData.getSection())) { ... 400 ... }
         registration.setSection(newData.getSection());
         return ResponseEntity.ok(registrationRepository.save(registration));
 ```
-Only the admin or the student who owns it → otherwise **403**. **Only the section can change.** To change the course, drop it and register again, like in a real system.
+Only the admin or the owner (**403** otherwise). Only the section changes. To change the course, drop it and register again.
 
-#### DELETE: drop the course
-```java
-        if (!isOwnerOrAdmin(found.get(), auth)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "you can only drop your own registrations"));
-        }
-        registrationRepository.deleteById(id);
-        return ResponseEntity.noContent().build();
-```
-Only the admin or the owner → **204**.
+**DELETE: drop the course.** Admin or owner only (**403**) → **204**.
 
-#### Helpers
-```java
-    // the admin chooses the student by username, a student always registers themself
-    private Optional<Student> findStudent(Registration data, Authentication auth) { ... }
-```
-The same idea as `findTeacher` in the course controller.
+**Helpers:**
 
-```java
-    private boolean isOwnerOrAdmin(Registration registration, Authentication auth) {
-        return hasRole(auth, "ADMIN") || registration.getStudent().getUsername().equals(auth.getName());
-    }
-```
-`true` for the admin, or if the registration's student is the logged-in user.
-
-```java
-    // admin: every registration, teacher: registrations in their courses, student: their own
-    private boolean canSee(Registration registration, Authentication auth) { ... }
-```
-Who may **read** one registration.
-
-```java
-    private boolean hasRole(Authentication auth, String role) {
-        return auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + role));
-    }
-```
-`hasRole(auth, "TEACHER")` is true if the user has `ROLE_TEACHER`.
+| Method | Meaning |
+|---|---|
+| `findStudent(data, auth)` | A student → the logged-in student. The admin → the student with the username sent in JSON. |
+| `isOwnerOrAdmin(registration, auth)` | Admin, or the registration's student is the logged-in user. |
+| `canSee(registration, auth)` | Admin → yes. Teacher → if it is in their course. Student → if it is theirs. |
+| `hasRole(auth, "TEACHER")` | `true` if the user has `ROLE_TEACHER`. |
 
 ---
 
-### 8.12 `controller/MeController.java`
+### 10.12 `controller/MeController.java`
 
 ```java
 @RestController
@@ -1234,11 +1659,11 @@ public class MeController {
     }
 }
 ```
-`GET /api/me` returns e.g. `{"username":"teacher1","role":"TEACHER"}`. The role is the user's first (only) authority, such as `ROLE_TEACHER`, with `ROLE_` removed. The dashboard uses this to show the name and choose the tabs.
+`GET /api/me` → `{"username":"teacher1","role":"TEACHER"}`. It takes the user's role (`ROLE_TEACHER`) and removes `ROLE_`. The dashboard uses it to show the name and choose the tabs.
 
 ---
 
-### 8.13 `security/SecurityConfig.java`
+### 10.13 `security/SecurityConfig.java`
 
 All the Spring Security settings are in this one file.
 
@@ -1255,7 +1680,7 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 ```
-**Password hashing.** One BCrypt encoder, used everywhere. BCrypt is a **one-way** hash with a random salt: you can't get the password back from the hash. At login, Spring checks the typed password against the stored hash.
+**Password hashing:** one BCrypt encoder, used everywhere. BCrypt is **one-way** with a random salt. At login, Spring checks the typed password against the hash.
 
 ```java
     @Bean
@@ -1263,51 +1688,46 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
 ```
-The **filter chain** is the list of security checks every request passes through. CSRF tokens are turned off to keep REST testing with Postman simple, which is common in student REST projects.
+The **filter chain** = the security checks every request passes through. CSRF tokens are turned off to keep REST testing with Postman simple, which is common in student REST projects.
 
 ```java
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login.html", "/style.css", "/error").permitAll()
 ```
-**Role-based access control starts here.** Spring checks the rules **from top to bottom** and uses the **first one that matches**. Anyone can open the login page, the CSS and the error page.
+**RBAC starts here.** Rules are checked **from top to bottom**, and the **first match wins**. Anyone can open the login page, the CSS and the error page.
 
 ```java
                 .requestMatchers("/api/admins/**").hasRole("ADMIN")
 ```
-`/api/admins` and everything under it: **ADMIN only**.
+Admins: **ADMIN only**.
 
 ```java
                 // only the admin can add new teachers and students
                 .requestMatchers(HttpMethod.POST, "/api/teachers/**", "/api/students/**").hasRole("ADMIN")
 ```
-**POST** (create) on teachers or students: **ADMIN only**. It must come **before** the next two lines.
+**Creating** teachers or students: **ADMIN only**. This line must come **before** the next two.
 
 ```java
                 .requestMatchers("/api/teachers/**").hasAnyRole("ADMIN", "TEACHER")
                 .requestMatchers("/api/students/**").hasAnyRole("ADMIN", "STUDENT")
 ```
-Teachers: **ADMIN or TEACHER**. Students: **ADMIN or STUDENT**. Which record they may change is checked later, in the controller.
+Teachers: **ADMIN or TEACHER**. Students: **ADMIN or STUDENT**. This is **the task's note**.
 
 ```java
                 // everyone can see courses, only the admin and teachers can change them
                 .requestMatchers(HttpMethod.GET, "/api/courses/**").hasAnyRole("ADMIN", "TEACHER", "STUDENT")
                 .requestMatchers("/api/courses/**").hasAnyRole("ADMIN", "TEACHER")
-```
-**GET** courses: every role. Anything else (POST, PUT, DELETE): **ADMIN or TEACHER**.
-
-```java
                 // everyone can see registrations (the controller filters them), only the admin and students can change them
                 .requestMatchers(HttpMethod.GET, "/api/registrations/**").hasAnyRole("ADMIN", "TEACHER", "STUDENT")
                 .requestMatchers("/api/registrations/**").hasAnyRole("ADMIN", "STUDENT")
 ```
-**GET** registrations: every role (the controller gives each role only what it may see). POST, PUT and DELETE: **ADMIN or STUDENT**.
+Courses: everyone can **read**, admin and teacher can **change**. Registrations: everyone can **read** (filtered per role), admin and student can **change**.
 
 ```java
                 .anyRequest().authenticated()
             )
 ```
-Everything else (dashboard, app.js, /api/me) needs any logged-in user.
-Not logged in → **401** (a browser is sent to the login page instead). Wrong role → **403**.
+Everything else (dashboard, app.js, /api/me) needs any logged-in user. Not logged in → **401** (a browser is sent to the login page instead). Wrong role → **403**.
 
 ```java
             .formLogin(form -> form
@@ -1318,16 +1738,16 @@ Not logged in → **401** (a browser is sent to the login page instead). Wrong r
                 .permitAll()
             )
 ```
-**Login with a form:**
-- `loginPage`: our page.
-- `loginProcessingUrl`: the form posts to `/login`, and **Spring checks the username and password itself**.
-- `defaultSuccessUrl`: after a successful login → the dashboard.
-- `failureUrl`: after a failed login → back to the login page with `?error`.
+**Login:**
+- `loginPage` = our page.
+- `loginProcessingUrl` = the form posts to `/login`, and Spring checks the password itself.
+- `defaultSuccessUrl` = after a successful login → the dashboard.
+- `failureUrl` = after a failed login → back with `?error`.
 
 ```java
             .httpBasic(Customizer.withDefaults())
 ```
-This also allows **HTTP Basic** login (username and password in a header), which Postman and `curl -u` use.
+This also allows **HTTP Basic** login (username and password in a header), which Postman and curl use.
 
 ```java
             .logout(logout -> logout
@@ -1340,54 +1760,45 @@ This also allows **HTTP Basic** login (username and password in a header), which
     }
 }
 ```
-**Logout:** `/logout` ends the session, then goes to the login page with `?logout`. `http.build()` creates the filter chain.
+**Logout:** `/logout` ends the session, then goes to the login page with `?logout`. `http.build()` creates the chain.
 
-> **Who checks what?**
-> - **`SecurityConfig`** checks the **role**: may this role use this URL and method at all?
-> - **The controllers** check the **owner**: is this record yours (your account, your course, your registration)? Only the controller knows which record is being changed.
+> **Two levels of security:**
+> - **`SecurityConfig`** checks the **role** for each URL and method.
+> - **The controllers** check the **owner** (`isAdmin(auth)` / `auth.getName()`), because only they know which record is being changed.
 
 ---
 
-### 8.14 `security/MyUserDetailsService.java`
+### 10.14 `security/MyUserDetailsService.java`
 
-At login, Spring Security asks a **`UserDetailsService`**: *"give me the user with this username"*. Users are in **three tables**, and the **role chosen on the login page** decides which table to look in.
+At login, Spring Security asks: *"give me the user with this username"*. Users are in **three tables**, and the **role chosen on the login page** decides which one to look in.
 
 ```java
 @Service
 public class MyUserDetailsService implements UserDetailsService {
 ```
-`@Service` = Spring creates it. Because it implements `UserDetailsService`, Spring Security uses it at login automatically. The 3 repositories are injected through the constructor.
+`@Service` = Spring creates it. Because it implements `UserDetailsService`, Spring Security uses it at login. The 3 repositories are injected through the constructor.
 
 ```java
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         String role = selectedRole();
-```
-Spring calls this with the typed username. First we read the **role from the login page** (`ADMIN`, `TEACHER` or `STUDENT`).
 
-```java
         if (role == null || role.equals("ADMIN")) {
             Optional<Admin> admin = adminRepository.findByUsername(username);
             if (admin.isPresent()) {
                 return User.withUsername(username).password(admin.get().getPassword()).roles("ADMIN").build();
             }
         }
-```
-If "Admin" was selected, look in the **admin** table. If found, build a Spring Security `User` with:
-- the username,
-- the **hashed** password (Spring compares it with the typed password using BCrypt),
-- the role **ADMIN**, stored as `ROLE_ADMIN`, which `hasRole("ADMIN")` checks.
-
-(`role == null` happens with Postman / curl, which don't send a role. Then all three tables are checked in order.)
-
-```java
         if (role == null || role.equals("TEACHER")) { ... teacher table, role TEACHER ... }
         if (role == null || role.equals("STUDENT")) { ... student table, role STUDENT ... }
 
         throw new UsernameNotFoundException("User not found: " + username);
     }
 ```
-The same for teachers and students. Not found → login fails → *"Wrong username, password or role!"*.
+- Read the selected role.
+- Look in the **matching table**. If the user is found, return a Spring Security `User` with the username, the **hashed** password (Spring compares it with BCrypt) and the role (stored as `ROLE_ADMIN` and so on).
+- Not found → the login fails.
+- `role == null` happens with Postman / curl (no form). Then all three tables are checked in order.
 
 ```java
     // the role chosen on the login page (null when logging in from Postman/curl, then all tables are checked)
@@ -1399,75 +1810,89 @@ The same for teachers and students. Not found → login fails → *"Wrong userna
         return attributes.getRequest().getParameter("role");
     }
 ```
-`RequestContextHolder` gives the **current HTTP request** (the login form). We read its field `role`, which is the "Login as" dropdown.
+`RequestContextHolder` gives the **current HTTP request**. We read its form field `role`, which is the "Login as" dropdown.
 
 ---
 
-### 8.15 `resources/application.properties`
+### 10.15 `resources/application.properties`
 
+```properties
+# the app runs on http://localhost:8081
+server.port=8081
+
+# database: an H2 file database saved in the "data" folder (nothing to install)
+# AUTO_SERVER=TRUE lets another program look inside the database while the app is running
+# Docker Compose replaces these three values with MySQL ones
+spring.datasource.url=jdbc:h2:file:./data/ums;AUTO_SERVER=TRUE
+spring.datasource.username=sa
+spring.datasource.password=
+
+# create / update the tables automatically from the @Entity classes
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.open-in-view=false
+```
 | Line | Meaning |
 |---|---|
-| `# ...` | Lines starting with `#` are comments. |
-| `server.port=8081` | The web server listens on port **8081**, so the address is `http://localhost:8081`. |
-| `spring.datasource.url=jdbc:h2:file:./data/ums` | Use an **H2 database saved in the file `data/ums`** inside the project. Nothing needs to be installed. |
-| `spring.datasource.username=sa` | The H2 user (`sa` is H2's default). |
-| `spring.datasource.password=` | An empty password for H2. |
-| `spring.jpa.hibernate.ddl-auto=update` | **Create or update the tables automatically** from the `@Entity` classes, so no SQL is needed. |
-| `spring.jpa.open-in-view=false` | Close the database connection when the request work is done. This is the recommended setting and removes a warning. |
+| `# ...` | Comments. |
+| `server.port=8081` | The address is `http://localhost:8081`. |
+| `spring.datasource.url=jdbc:h2:file:./data/ums;AUTO_SERVER=TRUE` | Use an **H2 database in the file `data/ums`**. `AUTO_SERVER=TRUE` lets a second program (like the H2 Shell command in step 5b of the presentation) read the database while the app runs. |
+| `spring.datasource.username=sa` / `password=` | The H2 login (`sa`, empty password). |
+| `spring.jpa.hibernate.ddl-auto=update` | **Create or update the tables automatically** from the entities. |
+| `spring.jpa.open-in-view=false` | Close the database connection when the request work is done (recommended; removes a warning). |
 
-**In Docker**, `compose.yaml` sets the environment variables `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`. Spring Boot automatically lets environment variables **override** the same settings here, so in Docker the app uses MySQL. No code changes are needed.
+In Docker, the environment variables in `compose.yaml` replace the three `spring.datasource.*` values with MySQL ones.
 
 ---
 
-### 8.16 `resources/static/login.html`
+### 10.16 `resources/static/login.html`
 
 | Line(s) | Meaning |
 |---|---|
 | `<meta charset="UTF-8">` | Normal text encoding. |
 | `<title>Login - ...</title>` | The browser tab title. |
-| `<link rel="stylesheet" href="/style.css">` | Use our CSS file. |
-| `<div class="login-box">` | The white box in the middle of the page. |
-| `<p id="msg"></p>` | An empty line for error and logout messages. |
-| `<form action="/login" method="post">` | Submitting sends the form to `POST /login`, which Spring Security handles. |
-| `<select name="role">` with 3 `<option>`s | The **"Login as"** dropdown. It sends `role=ADMIN`, `TEACHER` or `STUDENT`, which `MyUserDetailsService` reads. |
-| `<input type="text" name="username" required>` | The username box. The name **must** be `username` for Spring. `required` = can't be empty. |
-| `<input type="password" name="password" required>` | The password box (the letters are hidden). The name **must** be `password`. |
+| `<link rel="stylesheet" href="/style.css">` | Use our CSS. |
+| `<div class="login-box">` | The white box in the middle. |
+| `<p id="msg"></p>` | The place for error and logout messages. |
+| `<form action="/login" method="post">` | Sends the form to `POST /login` (handled by Spring Security). |
+| `<select name="role">` + 3 `<option>`s | The **"Login as"** dropdown → `role=ADMIN/TEACHER/STUDENT`. |
+| `<input type="text" name="username" required>` | The username. The name **must** be `username`. `required` = can't be empty. |
+| `<input type="password" name="password" required>` | The password (hidden letters). The name **must** be `password`. |
 | `<button type="submit">Login</button>` | Sends the form. |
-| `if (location.search.includes("error"))` | If the URL ends with `?error` → red "Wrong username, password or role!". |
-| `if (location.search.includes("logout"))` | If the URL ends with `?logout` → green "You have been logged out.". |
+| `if (location.search.includes("error"))` | The URL has `?error` → red "Wrong username, password or role!". |
+| `if (location.search.includes("logout"))` | The URL has `?logout` → green "You have been logged out.". |
 
 ---
 
-### 8.17 `resources/static/index.html` (dashboard)
+### 10.17 `resources/static/index.html` (dashboard)
 
 Only the structure. The logic is in `app.js`.
 
 | Line(s) | Meaning |
 |---|---|
-| `<div class="header">` | The dark bar at the top. |
+| `<div class="header">` | The dark top bar. |
 | `<b>University Management System</b>` | The title on the left. |
-| `<span class="right"> Logged in as <b id="me"></b> \| <a href="/logout">Logout</a>` | On the right: name and role (filled by app.js) and the logout link. |
+| `<span class="right"> Logged in as <b id="me"></b> \| <a href="/logout">Logout</a>` | On the right: the name and role (filled by app.js) and the logout link. |
 | `<div class="container">` | The white content box. |
-| `<div id="tabs" class="tabs"></div>` | Empty. app.js adds the tab buttons for your role. |
-| `<h3 id="listTitle"></h3>` | "All Courses", "My Registrations" and so on. |
-| `<p id="hint" class="hint"></p>` | The grey help line, e.g. "Click Register to take a course." |
-| `<table id="table"></table>` | Empty. app.js fills it with rows. |
+| `<div id="tabs" class="tabs"></div>` | app.js adds the tab buttons here. |
+| `<h3 id="listTitle"></h3>` | "All Courses", "My Registrations"... |
+| `<p id="hint" class="hint"></p>` | The grey help line. |
+| `<table id="table"></table>` | app.js fills it with rows. |
 | `<p id="msg"></p>` | The success or error message. |
-| `<div id="formBox">` | Everything about the form. app.js shows or hides it. |
+| `<div id="formBox">` ... `</div>` | The form area. app.js shows or hides it. |
 | `<hr>` | A line above the form. |
-| `<h3 id="formTitle"></h3>` | "Add New Course", "Edit Course (ID 2)", "Edit My Account"... |
-| `<div id="form"></div>` | Empty. app.js builds the input boxes. |
-| `<button onclick="save()">Save</button>` | Calls `save()` in app.js. |
+| `<h3 id="formTitle"></h3>` | "Add New Course", "Edit My Account"... |
+| `<div id="form"></div>` | app.js builds the input boxes here. |
+| `<button onclick="save()">Save</button>` | Calls `save()`. |
 | `<button onclick="resetForm()">Cancel</button>` | Stops editing. |
-| `<script src="/app.js"></script>` | Loads the JavaScript. It sits at the end, so the HTML above already exists when it runs. |
+| `<script src="/app.js"></script>` | Loads the JavaScript. It sits at the end, so the HTML above already exists. |
 
 ---
 
-### 8.18 `resources/static/app.js` (dashboard logic)
+### 10.18 `resources/static/app.js` (dashboard logic)
 
-This file talks to the REST API with **`fetch`**. The browser already has the login session cookie, so every call is sent as the logged-in user. **One set of functions works for all 5 tabs**, because each tab is described by settings in `TABS`.
+It talks to the REST API with **`fetch`**. The browser sends the login session cookie automatically. **One set of functions works for all 5 tabs**, because each tab is described by settings in `TABS`.
 
-#### The settings: `TABS`
+#### The settings: `TABS`, `ALLOWED`, state variables
 
 ```js
 var TABS = {
@@ -1489,14 +1914,12 @@ var TABS = {
     }
 };
 ```
-Each tab has:
-
 | Setting | Meaning | Example |
 |---|---|---|
-| `columns` | table columns as `[path in the JSON, label]`. A path with dots goes **inside** objects | `"teacher.name"` → `row.teacher.name` |
-| `form` | form boxes as `[path, label, rule]` | rule `"admin"` = only the admin sees this box. `"new"` = only when adding. `"admin new"` = both |
-| `password` | the form also has a password box (people tabs) | `true` |
-| `ownerRole` / `ownerPath` | who owns a row: a row is **mine** if my role is `ownerRole` and the username at `ownerPath` is mine | courses: a TEACHER owns a course where `teacher.username` is theirs |
+| `columns` | table columns `[path, label]`. A dotted path goes **inside** objects | `"teacher.name"` → `row.teacher.name` |
+| `form` | form boxes `[path, label, rule]` | rule `"admin"` = only the admin sees it. `"new"` = only when adding |
+| `password` | the form has a password box (people tabs) | `true` |
+| `ownerRole` / `ownerPath` | a row is **mine** if my role is `ownerRole` and the username at `ownerPath` is mine | a course is a TEACHER's if `teacher.username` is theirs |
 | `adders` | which roles may add rows | courses: admin and teacher |
 
 ```js
@@ -1505,16 +1928,13 @@ var ALLOWED = {
     TEACHER: ["teachers", "courses", "registrations"],
     STUDENT: ["students", "courses", "registrations"]
 };
-```
-Which tabs each role gets. The page only *hides* what you can't use; the **server** is what really blocks it with 403.
 
-```js
 var me = null;        // the logged-in user, for example {username: "teacher1", role: "TEACHER"}
 var current = "";     // the open tab, for example "teachers"
 var items = [];       // the rows loaded from the server
 var editing = null;   // the row being edited (null = adding a new one)
 ```
-Four variables that remember the page state.
+The tabs per role, plus four variables that remember the page state. The page only *hides* what you can't use; the **server** really blocks it with 403.
 
 #### When the page opens
 ```js
@@ -1523,10 +1943,7 @@ fetch("/api/me").then(function (res) {
 }).then(function (data) {
     me = data;
     document.getElementById("me").innerText = me.username + " (" + me.role + ")";
-```
-Ask the server who is logged in, keep it in `me`, and show "teacher1 (TEACHER)" in the top bar.
 
-```js
     var html = "";
     ALLOWED[me.role].forEach(function (tab) {
         html += "<button id='tab-" + tab + "' onclick=\"openTab('" + tab + "')\">" + tabName(tab) + "</button> ";
@@ -1536,27 +1953,24 @@ Ask the server who is logged in, keep it in `me`, and show "teacher1 (TEACHER)" 
     openTab(ALLOWED[me.role][0]);
 });
 ```
-Make one tab button per allowed tab, then open the first one.
+Ask who is logged in, show it in the top bar, make one button per allowed tab, and open the first tab.
 
 #### Small "who am I" functions
 
-| Function | What it returns |
+| Function | Returns |
 |---|---|
 | `isAdmin()` | `true` if the role is ADMIN. |
-| `isMine(item)` | `true` if this row is **yours**: your role is the tab's `ownerRole` **and** the username at `ownerPath` is your username. |
+| `isMine(item)` | `true` if the row is **yours** (your role = `ownerRole` **and** the username at `ownerPath` = yours). |
 | `canAdd()` | `true` if your role is in the tab's `adders`. |
-| `tabName(tab)` | The button text. It is "My Registrations" for students, otherwise e.g. "Courses". |
-| `hint()` | The grey help line for your role and tab (empty for the admin). |
+| `tabName(tab)` | The button text ("My Registrations" for students). |
+| `hint()` | The grey help line for your role and tab. |
 
-#### `openTab(tab)`: switch tabs
+#### `openTab(tab)`
 ```js
     current = tab;
     document.querySelectorAll("#tabs button").forEach(function (button) { button.className = ""; });
     document.getElementById("tab-" + tab).className = "active";
-```
-Remember the tab and highlight its button (dark blue).
 
-```js
     var title = "All " + capital(tab);
     if (tab == "registrations" && me.role == "STUDENT") title = "My Registrations";
     if (tab == "registrations" && me.role == "TEACHER") title = "Registrations in My Courses";
@@ -1567,9 +1981,9 @@ Remember the tab and highlight its button (dark blue).
     resetForm();
     loadList();
 ```
-Set the title and hint, clear the old message, reset the form, and load the table.
+Remember the tab, highlight its button, set the title and hint, clear the message, reset the form, and load the table.
 
-#### `loadList()`: READ (GET)
+#### `loadList()`: READ
 ```js
     fetch("/api/" + current).then(function (res) {
         if (!res.ok) {
@@ -1577,21 +1991,12 @@ Set the title and hint, clear the old message, reset the form, and load the tabl
             return [];
         }
         return res.json();
-    })
-```
-`GET /api/courses` (for example). On an error, show it and use an empty list.
-
-```js
-    .then(function (list) {
+    }).then(function (list) {
         items = list;
         var columns = TABS[current].columns;
         var html = "<tr><th>ID</th>";
         columns.forEach(function (c) { html += "<th>" + c[1] + "</th>"; });
         html += "<th>Actions</th></tr>";
-```
-Keep the list and build the header row: ID, one column per setting, then Actions.
-
-```js
         if (list.length == 0) {
             html += "<tr><td colspan='" + (columns.length + 2) + "'>No data yet</td></tr>";
         }
@@ -1602,19 +2007,16 @@ Keep the list and build the header row: ID, one column per setting, then Actions
             html += "<td>" + buttons(item, i) + "</td></tr>";
         });
         document.getElementById("table").innerHTML = html;
+    });
 ```
-"No data yet" if the list is empty. For each row: your own rows get the class `mine` (yellow), then the ID, each column's value (`getValue` reads paths like `teacher.name`), and the allowed buttons.
+`GET /api/{tab}`. On an error, show it. Otherwise build the header row, then one row per item: your rows get the class `mine` (yellow), each column's value (`getValue` reads paths like `teacher.name`), and the allowed buttons.
 
-#### `buttons(item, i)`: which buttons a row gets
+#### `buttons(item, i)`
 ```js
     var mine = isMine(item);
     var canEdit = isAdmin() || mine;
     var canDelete = isAdmin() ? !mine : mine;   // admin: everything except their own account, others: only their own rows
-```
-- **Edit**: the admin can edit any row; others only their own.
-- **Delete**: the admin can delete anything except their own account; others only their own rows.
 
-```js
     var html = "";
     if (current == "courses" && me.role == "STUDENT") html += "<button onclick='registerCourse(" + i + ")'>Register</button> ";
     if (canEdit) html += "<button onclick='editRow(" + i + ")'>Edit</button> ";
@@ -1622,21 +2024,22 @@ Keep the list and build the header row: ID, one column per setting, then Actions
     if (mine && TABS[current].password) html += "<i>(you)</i>";
     return html == "" ? "-" : html;
 ```
-- Students get **Register** on every course.
-- Then come **Edit** and **Delete** (**Drop** for registrations) if allowed.
-- "(you)" marks your own account row.
-- If there is no button at all, show "-".
+- **Edit**: the admin on any row, others only on their own.
+- **Delete**: the admin on everything except their own account, others only on their own rows.
+- Students get **Register** on courses. Registrations say **Drop** instead of Delete.
+- "(you)" marks your account row, and `-` means no buttons.
 
-#### `showField(field)`: is a form box shown?
+#### `showField`, `buildForm`, `resetForm`, `editRow`
 ```js
+function showField(field) {
     var rule = field[2] || "";
     if (rule.indexOf("admin") >= 0 && !isAdmin()) return false;
     if (rule.indexOf("new") >= 0 && editing != null) return false;
     return true;
+}
 ```
-A box with the rule `"admin"` is hidden for non-admins, and a box with the rule `"new"` is hidden while editing. That is why a student editing a registration sees only **Section**.
+Hides `"admin"` boxes from non-admins, and `"new"` boxes while editing. (That is why a student editing a registration only sees **Section**.)
 
-#### `buildForm()`, `resetForm()`, `editRow(i)`
 ```js
 function buildForm() {
     var html = "";
@@ -1651,7 +2054,7 @@ function buildForm() {
     document.getElementById("form").innerHTML = html;
 }
 ```
-One label and box for each allowed field. The box id is `f-` + the path (e.g. `f-course.code`). The people tabs also get a password box. `autocomplete` stops the browser from filling in your own saved login.
+One label and box per allowed field (the box id is `f-` + the path), plus a password box for people. `autocomplete` stops the browser from filling in your own saved login.
 
 ```js
 function resetForm() {
@@ -1661,7 +2064,7 @@ function resetForm() {
     document.getElementById("formBox").style.display = canAdd() ? "block" : "none";
 }
 ```
-An empty "Add New ..." form. It is **shown only if you may add** in this tab (`block` = show, `none` = hide).
+An empty "Add New" form, **shown only if you may add** in this tab.
 
 ```js
 function editRow(i) {
@@ -1679,7 +2082,7 @@ function editRow(i) {
     });
 }
 ```
-Remember the row being edited, build the boxes, set the title, show the form, and copy the row's values into the boxes.
+Remember the row, build the boxes, set the title, show the form, and fill in the values.
 
 #### `save()`: CREATE (POST) or UPDATE (PUT)
 ```js
@@ -1692,10 +2095,7 @@ Remember the row being edited, build the boxes, set the title, show the form, an
     if (TABS[current].password) {
         data.password = document.getElementById("f-password").value;
     }
-```
-Read the boxes into a JSON object. `setValue` turns a path into nested objects, e.g. `course.code` → `{course: {code: "CSE3230"}}`, which is exactly what the server expects.
 
-```js
     var isEdit = editing != null;
     var myAccount = isEdit && isMine(editing) && TABS[current].password;
     var url = isEdit ? "/api/" + current + "/" + editing.id : "/api/" + current;
@@ -1704,16 +2104,12 @@ Read the boxes into a JSON object. `setValue` turns a path into nested objects, 
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data)
-    })
-```
-Editing → `PUT /api/courses/3`. Adding → `POST /api/courses`. The data is sent as JSON.
-
-```js
-    .then(function (res) {
+    }).then(function (res) {
         if (!res.ok) {
             showError(res);
             return;
         }
+        // a new username or password only works after logging in again
         if (myAccount && (data.username != me.username || data.password != "")) {
             alert("Your login details were changed. Please log in again.");
             location.href = "/logout";
@@ -1724,9 +2120,11 @@ Editing → `PUT /api/courses/3`. Adding → `POST /api/courses`. The data is se
         loadList();
     });
 ```
-- On an error: show it in red, and the form keeps your input.
-- If you changed **your own** username or password: you're logged out, so you log in with the new details.
-- Otherwise: show a green message, reset the form and reload the table.
+- Read the boxes into JSON. `setValue` turns `course.code` into `{course: {code: ...}}`.
+- Editing → **PUT** `/api/{tab}/{id}`. Adding → **POST** `/api/{tab}`.
+- On an error → show it in red.
+- If you changed your own username or password → log out.
+- Otherwise → a green message, reset the form and reload the table.
 
 #### `deleteRow(i)`: DELETE
 ```js
@@ -1737,10 +2135,6 @@ Editing → `PUT /api/courses/3`. Adding → `POST /api/courses`. The data is se
     if (!confirm(question)) {
         return;
     }
-```
-Ask a clear "Are you sure?" question for each case. If you click Cancel, stop.
-
-```js
     fetch("/api/" + current + "/" + item.id, { method: "DELETE" }).then(function (res) {
         if (!res.ok) { showError(res); return; }
         if (myAccount) { location.href = "/logout"; return; }
@@ -1749,7 +2143,7 @@ Ask a clear "Are you sure?" question for each case. If you click Cancel, stop.
         loadList();
     });
 ```
-Send DELETE. If you deleted your own account, you're logged out. Otherwise show the message and reload.
+Ask a clear question, then send DELETE. If you deleted your own account, you're logged out. Otherwise show the message and reload.
 
 #### `registerCourse(i)`: a student registers
 ```js
@@ -1758,10 +2152,6 @@ Send DELETE. If you deleted your own account, you're logged out. Otherwise show 
     if (section == null) {
         return;
     }
-```
-A small box asks for the section (default "A"). Cancel → stop.
-
-```js
     fetch("/api/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1771,194 +2161,136 @@ A small box asks for the section (default "A"). Cancel → stop.
         showMessage("Registered for " + course.code + " (status " + res.status + "). See My Registrations.", "success");
     });
 ```
-`POST /api/registrations` with `{"course":{"code":"CSE3230"},"section":"A"}`. The server knows who the student is from the login. Already registered → "Error 409: already registered in this course".
+Ask for the section, then `POST /api/registrations`. The server knows the student from the login.
 
-#### Small helpers
+#### Helpers
 
 | Function | What it does |
 |---|---|
-| `getValue(obj, "teacher.name")` | Follows the path through the objects (`obj.teacher.name`). Returns empty text if something is missing. |
-| `setValue(obj, "teacher.username", "t1")` | Creates the nested object: `obj.teacher = {username: "t1"}`. |
-| `showMessage(text, type)` | Writes into `#msg`. `type` is `"success"` (green) or `"error"` (red). |
-| `showError(res)` | Reads the server's answer `{"error":"..."}` and shows "Error 403: you can only edit your own courses". |
+| `getValue(obj, "teacher.name")` | Follows the path (`obj.teacher.name`). Returns empty text if something is missing. |
+| `setValue(obj, "teacher.username", "t1")` | Creates `obj.teacher = {username: "t1"}`. |
+| `showMessage(text, type)` | Writes into `#msg`. `"success"` = green, `"error"` = red. |
+| `showError(res)` | Reads `{"error":"..."}` from the server and shows "Error 403: ...". |
 | `capital("teachers")` | Returns "Teachers". |
-| `singular("teachers")` | Returns "Teacher" (removes the last letter "s"). |
-| `clean(value)` | Turns `<` into `&lt;`, so HTML typed into a field can't run on the page. |
+| `singular("teachers")` | Returns "Teacher". |
+| `clean(value)` | Turns `<` into `&lt;`, so typed HTML can't run on the page. |
 
 ---
 
-### 8.19 `resources/static/style.css`
+### 10.19 `resources/static/style.css`
 
 | Block | What it styles |
 |---|---|
-| `body` | Arial font, light grey background, no outer margin. |
-| `.login-box` (+ `label`, `input`, `select`, `button`) | The white 320px box in the middle of the login page, with full-width boxes and button. |
-| `.header`, `.header .right`, `.header a` | The dark blue top bar, with "Logged in as ... \| Logout" on the right in white. |
+| `body` | Arial font, light grey background. |
+| `.login-box` (+ `label`, `input`, `select`, `button`) | The white login box in the middle, with full-width fields. |
+| `.header`, `.header .right`, `.header a` | The dark blue top bar, with "Logged in as ... \| Logout" on the right. |
 | `.container` | The white content box, centered, max 950px wide. |
-| `.tabs button` / `.tabs button.active` | Tab buttons. The open tab is dark blue with white text. |
-| `table`, `th, td`, `th` | Table lines, spacing and a grey header row. |
-| `tr.mine td` | Light yellow background for **your own** rows. |
+| `.tabs button` / `.tabs button.active` | Tab buttons. The open tab is dark blue. |
+| `table`, `th, td`, `th` | Table lines, spacing, a grey header row. |
+| `tr.mine td` | **Your own rows** in light yellow. |
 | `.hint` | Grey help text. |
-| `.form-row`, `.form-row label`, `.form-row input` | Form rows. The label has a fixed width so the boxes line up. |
-| `.error` / `.success` | Red / green message text. |
+| `.form-row`, `label`, `input` | Form rows. The fixed-width labels line up the boxes. |
+| `.error` / `.success` | Red / green messages. |
 
 ---
 
-### 8.20 `Dockerfile`
+### 10.20 `Dockerfile` and `compose.yaml`
+Explained line by line in [3.10](#310-the-dockerfile-line-by-line) and [3.11](#311-the-composeyaml-line-by-line).
 
-The recipe for a **Docker image** of the app, in **two stages**: build with Maven, then run with Java only.
+### 10.21 `.dockerignore` and `.gitignore`
+- **`.dockerignore`**: files Docker should **not** copy into the image: `target`, `data` (the local H2 database), `.idea`, `.vscode`, `*.iml`.
+- **`.gitignore`**: files Git should **not** save: `target/`, `data/`, `.idea/`, `*.iml`.
 
-| Line | Meaning |
-|---|---|
-| `# Step 1: build the jar file using Maven` | A comment. |
-| `FROM maven:3.9-eclipse-temurin-17 AS build` | Start from an image that has **Maven + Java 17**. This stage is called `build`. |
-| `WORKDIR /app` | Work in the `/app` folder inside the container. |
-| `COPY pom.xml .` | Copy `pom.xml` in. |
-| `COPY src ./src` | Copy the source code in. |
-| `RUN mvn -q package -DskipTests` | Build `target/ums.jar` (`-q` = quiet, `-DskipTests` = skip tests). |
-| `# Step 2: run the jar file using only Java` | A comment. |
-| `FROM eclipse-temurin:17-jre` | A **new, smaller** image with only the Java runtime. |
-| `WORKDIR /app` | Work in `/app`. |
-| `COPY --from=build /app/target/ums.jar app.jar` | Copy **only the built jar** from the first stage. |
-| `EXPOSE 8081` | Says the app uses port 8081 (documentation). |
-| `ENTRYPOINT ["java", "-jar", "app.jar"]` | The command run when the container starts. |
+### 10.22 `UMS.postman_collection.json`
+A Postman file with **40 ready requests** in 3 folders (REST API, Security, Courses). Each request has:
+- the method, the URL (`{{baseUrl}}/api/...`) and a JSON body,
+- **Basic Auth** with the right user,
+- a **test** that checks the expected status code (e.g. `pm.response.to.have.status(201)`),
+- for some requests, a small script that saves an id for later requests (e.g. `pm.collectionVariables.set("demoTeacherId", ...)`).
+
+Import it into Postman as described in [7.2](#72-get-postman-ready-import-the-collection).
 
 ---
 
-### 8.21 `compose.yaml`
+## 11. Viva questions and answers
 
-It starts **two services together**: `db` (MySQL) and `app` (our app).
-
-| Line(s) | Meaning |
-|---|---|
-| `services:` | The list of containers. |
-| `db:` | Service 1, named **db**. |
-| `image: mysql:8.0` | The official MySQL 8 image. |
-| `MYSQL_ROOT_PASSWORD: root` | The MySQL root password. |
-| `MYSQL_DATABASE: university_db` | Create the database `university_db` on the first start. |
-| `ports: - "3307:3306"` | PC port 3307 → MySQL port 3306, so a DB tool can connect to `localhost:3307`. 3307 avoids a clash with an installed MySQL. |
-| `volumes: - db_data:/var/lib/mysql` | Keep the MySQL data in a **named volume**, so it survives restarts. |
-| `healthcheck:` ... `mysqladmin ping` | Every 5 s, ask "is MySQL ready?", up to 20 times. |
-| `app:` | Service 2, our app. |
-| `build: .` | Build its image from the `Dockerfile` here. |
-| `ports: - "8081:8081"` | Open the app at `http://localhost:8081`. |
-| `SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/university_db?...` | **Overrides** the H2 setting, so the app uses MySQL. The host is **`db`**, the service name, because containers in one compose file reach each other by name. `allowPublicKeyRetrieval=true&useSSL=false` lets the driver log in to MySQL 8 without SSL. |
-| `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | The MySQL login for the app. |
-| `depends_on: db: condition: service_healthy` | Start the app only **after MySQL is healthy**. |
-| `restart: on-failure` | If the app crashes (e.g. MySQL wasn't fully ready), start it again. |
-| `volumes: db_data:` | Declares the named volume. |
-
----
-
-### 8.22 `.dockerignore` and `.gitignore`
-
-- **`.dockerignore`**: files Docker should **not** copy into the image: `target` (old builds), `data` (the local H2 database), and IDE settings (`.idea`, `.vscode`, `*.iml`).
-- **`.gitignore`**: files Git should **not** save: `target/`, `data/`, `.idea/`, `*.iml`. Build output and the local database don't belong in the repository.
-
----
-
-## 9. Docker explained
-
-### Basic words
-
-| Word | Simple meaning |
-|---|---|
-| **Image** | A packed box with everything needed to run a program (system files + Java + our jar). Like a **class**. |
-| **Container** | A running image. Like an **object** made from the class. |
-| **Dockerfile** | The recipe to **build an image** of our app. |
-| **Docker Compose** | Runs **several containers together** (app + MySQL) from one file, `compose.yaml`. |
-| **Volume** | Storage outside the container, so the data isn't lost when the container is removed. |
-| **Port mapping `8081:8081`** | `PC port : container port`. It lets your browser reach the app inside the container. |
-
-### What happens on `docker compose up --build`
-```
-docker compose up --build
-   │
-   ├── db  container  ← image "mysql:8.0" (downloaded from Docker Hub)
-   │      waits until healthy
-   │
-   └── app container  ← image built from OUR Dockerfile
-          1) stage 1: Maven builds ums.jar
-          2) stage 2: Java runs ums.jar
-          3) app connects to MySQL at "db:3306", creates the tables + sample data
-          4) open http://localhost:8081
-```
-
-### Commands (run them in the project folder)
-
-| Command | What it does |
-|---|---|
-| `docker --version` | Check that Docker is installed. |
-| `docker compose up --build` | **Build and start everything.** Use it the first time and after every code change. Stop with `Ctrl + C`. |
-| `docker compose up -d --build` | The same, in the background (`-d` = detached). |
-| `docker compose ps` | Show the running containers. |
-| `docker compose logs app` | Show the app's logs (`-f` to keep following). |
-| `docker compose stop` | Stop the containers (`docker compose start` starts them again). |
-| `docker compose down` | Stop **and remove** the containers. The MySQL data stays in the volume. |
-| `docker compose down -v` | Remove the containers **and** the MySQL data, for a fresh start. |
-| `docker images` | List the images on your PC. |
-| `docker build -t ums .` | Build only the app image (`-t ums` = name it "ums", `.` = the Dockerfile is here). |
-
-> **Why not just `docker run` the image?** The app alone would have no MySQL to connect to. **Compose** starts MySQL next to it and connects them. That is why the task asks for `compose.yaml`.
-
-You can also see the containers, logs and stop buttons in **Docker Desktop → Containers**.
-
----
-
-## 10. Viva questions and answers
-
+### About Spring Boot
 | Question | Answer |
 |---|---|
-| What is Spring Boot? | Spring with automatic configuration and a built-in web server, so a web app starts with just a `main` method. |
-| How do you create a Spring Boot project? | On **start.spring.io**: choose Maven, Java 17, add the dependencies, Generate, then open the folder in IntelliJ. |
+| What is Spring Boot? | Spring with automatic configuration and a built-in Tomcat server, so a web app starts with just a `main` method. |
+| How do you create a Spring Boot project? | On **start.spring.io**: Maven, Java 17, add the dependencies, Generate, open in IntelliJ. |
 | Which file runs first? | `UmsApplication.java` (`@SpringBootApplication` + `main()`). |
 | What does `@SpringBootApplication` do? | It turns on auto-configuration and scans the package for components. |
-| What is `pom.xml`? | The Maven file with the project info and libraries (dependencies). |
+| What is `pom.xml`? | The Maven file with the project info and dependencies. |
 | What is `application.properties`? | The settings file (port, database). It is loaded automatically. |
-| What is an Entity? | A Java class mapped to a database table (`@Entity`). |
-| What is `@ManyToOne`? | A link from many rows to one row, e.g. many courses → one teacher. It becomes a foreign key column (`teacher_id`). |
-| What does `@OnDelete(CASCADE)` do? | It adds `ON DELETE CASCADE` to the foreign key: deleting a teacher deletes their courses, and deleting a course deletes its registrations. |
-| What is a Repository? | An interface for database work. Spring Data JPA writes the code (`findAll`, `save`, `deleteById`...). |
-| How does `findByCourseTeacherUsername` work? | Spring reads the method name and follows the links registration → course → teacher → username to build the query. |
-| What is a RestController? | A class that handles HTTP requests and returns JSON. |
-| What is REST? | URLs for resources (`/api/courses`) and HTTP methods for actions: GET read, POST create, PUT update, DELETE delete. |
-| `@PathVariable` vs `@RequestBody`? | `@PathVariable` takes a value from the URL (`/courses/5`). `@RequestBody` takes the JSON body. |
-| Which status codes do you use? | 200, 201, 204, 400, 401, 403, 404, 409 (see section 5). |
+| What is dependency injection? | Spring creates the objects and passes them into constructors (e.g. a repository into a controller). |
+
+### About the REST API
+| Question | Answer |
+|---|---|
+| What is REST? | URLs are resources (`/api/teachers`), HTTP methods are actions (GET read, POST create, PUT update, DELETE delete), and data is JSON. |
+| What does `@RestController` do? | It makes a class whose methods return data that is turned into JSON automatically. |
+| `@PathVariable` vs `@RequestBody`? | `@PathVariable` takes a value from the URL (`/teachers/5`). `@RequestBody` takes the JSON body. |
+| How do you return a status code? | With `ResponseEntity`: `ok()` 200, `status(CREATED)` 201, `noContent()` 204, `badRequest()` 400, `notFound()` 404, `status(CONFLICT)` 409, `status(FORBIDDEN)` 403. |
+| Why 201 and not 200 for POST? | 201 Created means a new resource was made. That is the REST convention. |
+| Why 204 for DELETE? | The delete worked and there is nothing to send back. |
+| Who turns Java into JSON? | **Jackson**, which is included in `spring-boot-starter-web`. |
+
+### About the database
+| Question | Answer |
+|---|---|
+| What is an Entity? | A Java class mapped to a table (`@Entity`). |
+| What is a Repository? | An interface. Spring Data JPA writes the database code (`findAll`, `save`, `deleteById`...). |
+| How does `findByUsername` work without code? | Spring reads the method name and builds the query. |
+| What does `ddl-auto=update` do? | Hibernate creates or updates the tables from the entities. |
+| What is `@ManyToOne`? | A link from many rows to one row (many courses → one teacher). It becomes a foreign key. |
+| What does `@OnDelete(CASCADE)` do? | Deleting the "one" side deletes the linked rows (teacher → courses → registrations). |
+| Why H2 in IntelliJ and MySQL in Docker? | H2 needs no installation. Docker gives a real MySQL. Compose switches the database with environment variables. |
+
+### About Spring Security
+| Question | Answer |
+|---|---|
+| How does login work? | The form posts role, username and password to `/login`. Spring calls `MyUserDetailsService`, which loads the user from the chosen role's table. Spring compares the password with BCrypt and creates a session. |
+| How does logout work? | `/logout` ends the session (configured in `SecurityConfig.logout(...)`). |
+| How are passwords stored? | As **BCrypt hashes** (`$2a$10$...`), never as plain text. They are never returned in JSON (`WRITE_ONLY`). |
+| What is BCrypt? | A one-way hash with a random salt. The same password gives different hashes. At login, the typed password is checked against the hash. |
+| What is RBAC? | Role-Based Access Control: what you may do depends on your role. |
+| Where is RBAC in your code? | `SecurityConfig` → `hasRole` / `hasAnyRole` per URL. Each user gets their role in `MyUserDetailsService` → `.roles("TEACHER")`. |
 | 401 vs 403? | **401** = not logged in or wrong password. **403** = logged in, but not allowed. |
-| How are passwords stored? | As **BCrypt hashes** (`BCryptPasswordEncoder`), never as plain text. They are also never returned in JSON (`WRITE_ONLY`). |
-| What is BCrypt? | A one-way hash with a random salt. At login, the typed password is checked against the hash. |
-| How does login work? | The form posts role, username and password to `/login`. Spring calls `MyUserDetailsService`, which looks in the chosen role's table. Spring compares the password with BCrypt and creates a session. |
-| How does logout work? | `/logout` ends the session (configured in `SecurityConfig`). |
-| How does RBAC work? | In `SecurityConfig`: URL + method rules (`hasRole` / `hasAnyRole`), e.g. `/api/admins/**` needs ADMIN, POST teachers or students needs ADMIN, GET courses needs any role. |
-| Role check vs ownership check? | **Role** ("may teachers use /api/courses?") is in `SecurityConfig`. **Ownership** ("is this course yours?") is in the controller, comparing the record's username with `auth.getName()`. |
-| Can a teacher change another teacher's course? | No → 403 "you can only edit your own courses". |
-| Why does GET /api/registrations return different data? | The controller checks the role: the admin gets all, a teacher gets the registrations in their courses, a student gets their own. |
-| Can a student register twice in one course? | No → 409, checked with `existsByStudentAndCourse`. |
-| Why can't a teacher add teachers? | In a real university, the **admin** creates accounts. POST on teachers or students is ADMIN only. |
-| What is the Dockerfile for? | It builds an image of the app. Multi-stage: Maven builds the jar, a small Java image runs it. |
-| What is compose.yaml for? | It runs the app and MySQL together, with ports, a volume and a health check. |
-| How does the app find MySQL in Docker? | By the service name `db`: `jdbc:mysql://db:3306/...`. |
-| Why H2 in IntelliJ and MySQL in Docker? | H2 needs no installation. Docker gives a real MySQL. Environment variables in compose switch the app to MySQL. |
-| What does `ddl-auto=update` do? | Hibernate creates or updates the tables from the entities automatically. |
+| Role check vs ownership check? | **Role** is checked in `SecurityConfig` for each URL. **Ownership** ("is this record yours?") is checked in the controller with `auth.getName()`. |
+| Can a teacher change another teacher? | No → 403. Only their own account. |
+| Why can't a teacher create teachers? | In a real university, the admin creates accounts. POST on teachers or students is ADMIN only. |
+| Why is CSRF disabled? | To keep REST testing with Postman simple. In a production app with forms, it should be on. |
+| What is HTTP Basic? | Username and password sent in a header with each request. Postman and curl use it. |
+
+### About Docker
+| Question | Answer |
+|---|---|
+| What is Docker? | A tool that runs programs in containers with everything they need, so they work the same everywhere. |
+| Image vs container? | An image is the packed program (like a class). A container is a running image (like an object). |
+| What does your Dockerfile do? | It is a 2-stage build: Maven builds the jar, then a small Java 17 image runs it. |
+| Why two stages? | The final image is smaller: no Maven and no source code, only Java + the jar. |
+| What does compose.yaml do? | It runs **two services together**: MySQL (`db`) and the app (`app`), with ports, a volume, a health check and environment variables. |
+| How does the app find MySQL? | By the service name: `jdbc:mysql://db:3306/...`. Compose puts both containers on one network. |
+| Why the health check and `depends_on`? | The app starts only when MySQL is ready to accept connections. |
+| What is the volume for? | The MySQL data survives `docker compose down`. |
+| How do you start and stop it? | `docker compose up --build` / `docker compose down`. |
 
 ---
 
-## 11. Common problems
+## 12. Common problems
 
 | Problem | Solution |
 |---|---|
-| Red code / "Cannot resolve symbol" in IntelliJ | Maven tab → 🔄 **Reload All Maven Projects**. Check that **File → Project Structure → SDK** is **17**. |
-| No green ▶ next to `main` | Wait for Maven to finish, or right-click `UmsApplication.java` → **Run**. |
-| `Port 8081 was already in use` | The app is already running (in IntelliJ or Docker). Stop the other one first. |
-| "Wrong username, password or role!" | Check the **Login as** role. Passwords are case-sensitive. |
-| Teacher/student sees `-` instead of buttons | Correct. That row belongs to someone else. You can only change your own (yellow) rows. |
+| Red code / "Cannot resolve symbol" | Maven tab → 🔄 **Reload All Maven Projects**. Check that the SDK is **17**. |
+| `Port 8081 was already in use` | The app is already running (IntelliJ or Docker). Stop the other one. |
+| "Wrong username, password or role!" | Check the **Login as** role. Passwords are case-sensitive (section 4). |
+| Teacher/student sees `-` instead of buttons | Correct. That row belongs to someone else. |
 | "Error 403: you can only edit your own ..." | You tried to change someone else's record. Only the admin can do that. |
-| "Error 409: already registered in this course" | The student is already in that course. Change the section in **My Registrations** instead. |
-| "Error 400: teacher not found" (admin adding a course) | Type an existing teacher **username** (e.g. `teacher1`), not the name. |
-| Logged out right after saving my own account | You changed your own username or password. Log in again with the new details. |
-| Forgot a user's password | Log in as **admin** → open the tab → **Edit** the user → type a new password → **Save**. |
-| Want fresh data (IntelliJ) | Stop the app, delete the `data` folder, run again. |
-| Want fresh data (Docker) | `docker compose down -v`, then `docker compose up --build`. |
-| `docker` not recognised / cannot connect | Install and **start Docker Desktop**, then wait for "Engine running". |
-| Code changed but Docker shows the old version | Use `docker compose up --build`. |
-| App in Docker says `Communications link failure` | MySQL wasn't ready yet. The app restarts automatically, so wait a few seconds. |
+| "Error 409: already registered in this course" | Change the section in **My Registrations** instead. |
+| "Error 400: teacher not found" (admin adding a course) | Type the teacher's **username** (e.g. `teacher1`), not the name. |
+| Logged out after saving my own account | You changed your own username or password. Log in again with the new details. |
+| Forgot a password | Log in as **admin** → the right tab → **Edit** the user → type a new password → **Save**. |
+| Want fresh data | IntelliJ: stop the app, delete `data/`, run. Docker: `docker compose down -v`, then `docker compose up --build`. |
+| Postman requests fail with 409 or 404 | Run the folders **in order from the top**, and start with fresh data. |
+| Docker problems | See [3.3](#33-install-docker-desktop-on-windows-once) and [3.12](#312-docker-problems-while-running). |
