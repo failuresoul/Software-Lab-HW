@@ -1,133 +1,38 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>University Management System</title>
+    <meta charset="UTF-8">
+    <title>Dashboard - University Management System</title>
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<h2>University Management System</h2>
-<p id="me"></p>
-<a href="/logout">Logout</a>
-<hr>
 
-Resource:
-<select id="resource" onchange="loadList()"></select>
-<button onclick="loadList()">Refresh</button>
-<br><br>
-<table border="1" id="table"></table>
+<div class="header">
+    <b>University Management System</b>
+    <span class="right">
+        Logged in as <b id="me"></b> |
+        <a href="/logout">Logout</a>
+    </span>
+</div>
 
-<h3>Add / Edit</h3>
-<input type="hidden" id="id">
-Name: <input id="name"><br><br>
-Username: <input id="username" autocomplete="off"><br><br>
-Password: <input id="password" type="password" autocomplete="new-password"> (keep empty when editing to keep the old password)<br><br>
-<span id="extraRow"><span id="extraLabel"></span>: <input id="extra"><br><br></span>
-<button onclick="save()">Save</button>
-<button onclick="clearForm()">Clear</button>
-<p id="msg"></p>
+<div class="container">
+    <div id="tabs" class="tabs"></div>
 
-<script>
-    // the extra field each resource has (admin has none)
-    var extraField = { admins: null, teachers: "subject", students: "department" };
-    var items = [];
+    <h3 id="listTitle"></h3>
+    <p id="hint" class="hint"></p>
+    <table id="table"></table>
 
-    fetch("/api/me").then(function (res) { return res.json(); }).then(function (me) {
-        document.getElementById("me").innerText = "Logged in as " + me.username + " (" + me.role + ")";
+    <p id="msg"></p>
 
-        var allowed = [];
-        if (me.role == "ADMIN") allowed = ["admins", "teachers", "students"];
-        if (me.role == "TEACHER") allowed = ["teachers"];
-        if (me.role == "STUDENT") allowed = ["students"];
+    <div id="formBox">
+        <hr>
+        <h3 id="formTitle"></h3>
+        <div id="form"></div>
+        <button onclick="save()">Save</button>
+        <button onclick="resetForm()">Cancel</button>
+    </div>
+</div>
 
-        var select = document.getElementById("resource");
-        for (var i = 0; i < allowed.length; i++) {
-            select.innerHTML += "<option>" + allowed[i] + "</option>";
-        }
-        loadList();
-    });
-
-    function loadList() {
-        var resource = document.getElementById("resource").value;
-        var extra = extraField[resource];
-        document.getElementById("extraRow").style.display = extra ? "" : "none";
-        document.getElementById("extraLabel").innerText = extra;
-        clearForm();
-
-        fetch("/api/" + resource).then(function (res) { return res.json(); }).then(function (list) {
-            items = list;
-            var html = "<tr><th>ID</th><th>Name</th><th>Username</th>";
-            if (extra) html += "<th>" + extra + "</th>";
-            html += "<th>Action</th></tr>";
-
-            for (var i = 0; i < list.length; i++) {
-                html += "<tr><td>" + list[i].id + "</td><td>" + list[i].name + "</td><td>" + list[i].username + "</td>";
-                if (extra) html += "<td>" + list[i][extra] + "</td>";
-                html += "<td><button onclick='editItem(" + i + ")'>Edit</button> ";
-                html += "<button onclick='deleteItem(" + list[i].id + ")'>Delete</button></td></tr>";
-            }
-            document.getElementById("table").innerHTML = html;
-        });
-    }
-
-    function editItem(i) {
-        var extra = extraField[document.getElementById("resource").value];
-        document.getElementById("id").value = items[i].id;
-        document.getElementById("name").value = items[i].name;
-        document.getElementById("username").value = items[i].username;
-        document.getElementById("password").value = "";
-        if (extra) document.getElementById("extra").value = items[i][extra];
-    }
-
-    function deleteItem(id) {
-        if (!confirm("Delete id " + id + "?")) return;
-        var resource = document.getElementById("resource").value;
-        fetch("/api/" + resource + "/" + id, { method: "DELETE" }).then(function (res) {
-            document.getElementById("msg").innerText = "Delete status: " + res.status;
-            loadList();
-        });
-    }
-
-    function save() {
-        var resource = document.getElementById("resource").value;
-        var extra = extraField[resource];
-        var id = document.getElementById("id").value;
-
-        var data = {
-            name: document.getElementById("name").value,
-            username: document.getElementById("username").value,
-            password: document.getElementById("password").value
-        };
-        if (extra) data[extra] = document.getElementById("extra").value;
-
-        var url = "/api/" + resource;
-        var method = "POST";
-        if (id) {
-            url = url + "/" + id;
-            method = "PUT";
-        }
-
-        fetch(url, {
-            method: method,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data)
-        }).then(function (res) {
-            if (res.ok) {
-                document.getElementById("msg").innerText = "Saved! Status: " + res.status;
-                loadList();
-            } else {
-                res.text().then(function (text) {
-                    document.getElementById("msg").innerText = "Error " + res.status + ": " + text;
-                });
-            }
-        });
-    }
-
-    function clearForm() {
-        document.getElementById("id").value = "";
-        document.getElementById("name").value = "";
-        document.getElementById("username").value = "";
-        document.getElementById("password").value = "";
-        document.getElementById("extra").value = "";
-    }
-</script>
+<script src="/app.js"></script>
 </body>
 </html>

@@ -1,0 +1,111 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #f0f0f0;
+    margin: 0;
+}
+
+/* ---------- login page ---------- */
+.login-box {
+    background: white;
+    width: 320px;
+    margin: 80px auto;
+    padding: 20px 25px;
+    border: 1px solid #ccc;
+}
+
+.login-box label {
+    display: block;
+    margin-top: 12px;
+}
+
+.login-box input,
+.login-box select {
+    width: 100%;
+    padding: 6px;
+    box-sizing: border-box;
+}
+
+.login-box button {
+    width: 100%;
+    margin-top: 18px;
+    padding: 8px;
+}
+
+/* ---------- dashboard ---------- */
+.header {
+    background: #2c3e50;
+    color: white;
+    padding: 12px 20px;
+}
+
+.header .right {
+    float: right;
+}
+
+.header a {
+    color: white;
+}
+
+.container {
+    max-width: 950px;
+    margin: 20px auto;
+    background: white;
+    padding: 20px;
+    border: 1px solid #ccc;
+}
+
+.tabs button {
+    padding: 8px 18px;
+    cursor: pointer;
+}
+
+.tabs button.active {
+    background: #2c3e50;
+    color: white;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+th, td {
+    border: 1px solid #ccc;
+    padding: 6px 8px;
+    text-align: left;
+}
+
+th {
+    background: #e8e8e8;
+}
+
+tr.mine td {
+    background: #fff6d5;
+}
+
+.hint {
+    color: #555;
+}
+
+.form-row {
+    margin: 8px 0;
+}
+
+.form-row label {
+    display: inline-block;
+    width: 110px;
+}
+
+.form-row input {
+    width: 260px;
+    padding: 5px;
+}
+
+/* ---------- messages ---------- */
+.error {
+    color: #c0392b;
+}
+
+.success {
+    color: #27ae60;
+}

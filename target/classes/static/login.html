@@ -1,25 +1,45 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Login</title>
+    <meta charset="UTF-8">
+    <title>Login - University Management System</title>
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<h2>University Management System - Login</h2>
 
-<p id="msg"></p>
+<div class="login-box">
+    <h2>University Management System</h2>
+    <h3>Login</h3>
 
-<form action="/login" method="post">
-    Username: <input type="text" name="username"><br><br>
-    Password: <input type="password" name="password"><br><br>
-    <button type="submit">Login</button>
-</form>
+    <p id="msg"></p>
+
+    <form action="/login" method="post">
+        <label>Login as</label>
+        <select name="role">
+            <option value="ADMIN">Admin</option>
+            <option value="TEACHER">Teacher</option>
+            <option value="STUDENT">Student</option>
+        </select>
+
+        <label>Username</label>
+        <input type="text" name="username" required>
+
+        <label>Password</label>
+        <input type="password" name="password" required>
+
+        <button type="submit">Login</button>
+    </form>
+</div>
 
 <script>
+    var msg = document.getElementById("msg");
     if (location.search.includes("error")) {
-        document.getElementById("msg").innerText = "Wrong username or password!";
+        msg.className = "error";
+        msg.innerText = "Wrong username, password or role!";
     }
     if (location.search.includes("logout")) {
-        document.getElementById("msg").innerText = "You have been logged out.";
+        msg.className = "success";
+        msg.innerText = "You have been logged out.";
     }
 </script>
 </body>

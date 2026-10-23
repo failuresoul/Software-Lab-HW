@@ -11,6 +11,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.Optional;
 
@@ -31,21 +33,38 @@ public class MyUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        Optional<Admin> admin = adminRepository.findByUsername(username);
-        if (admin.isPresent()) {
-            return User.withUsername(username).password(admin.get().getPassword()).roles("ADMIN").build();
+        String role = selectedRole();
+
+        if (role == null || role.equals("ADMIN")) {
+            Optional<Admin> admin = adminRepository.findByUsername(username);
+            if (admin.isPresent()) {
+                return User.withUsername(username).password(admin.get().getPassword()).roles("ADMIN").build();
+            }
         }
 
-        Optional<Teacher> teacher = teacherRepository.findByUsername(username);
-        if (teacher.isPresent()) {
-            return User.withUsername(username).password(teacher.get().getPassword()).roles("TEACHER").build();
+        if (role == null || role.equals("TEACHER")) {
+            Optional<Teacher> teacher = teacherRepository.findByUsername(username);
+            if (teacher.isPresent()) {
+                return User.withUsername(username).password(teacher.get().getPassword()).roles("TEACHER").build();
+            }
         }
 
-        Optional<Student> student = studentRepository.findByUsername(username);
-        if (student.isPresent()) {
-            return User.withUsername(username).password(student.get().getPassword()).roles("STUDENT").build();
+        if (role == null || role.equals("STUDENT")) {
+            Optional<Student> student = studentRepository.findByUsername(username);
+            if (student.isPresent()) {
+                return User.withUsername(username).password(student.get().getPassword()).roles("STUDENT").build();
+            }
         }
 
         throw new UsernameNotFoundException("User not found: " + username);
+    }
+
+    // the role chosen on the login page (null when logging in from Postman/curl, then all tables are checked)
+    private String selectedRole() {
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes == null) {
+            return null;
+        }
+        return attributes.getRequest().getParameter("role");
     }
 }
