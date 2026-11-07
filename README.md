@@ -13,6 +13,7 @@ This README explains **everything**: how to run it (IntelliJ and Docker), how to
 | **REST API**: CRUD (Create, Read, Update, Delete) for Admin, Teacher and Student, with REST conventions, JSON responses and HTTP status codes | `GET` / `POST` / `PUT` / `DELETE` on `/api/admins`, `/api/teachers`, `/api/students`. Answers are JSON with status codes 200, 201, 204, 400, 401, 403, 404, 409 | `controller/` folder |
 | **Spring Security**: login, logout, password hashing, role-based access control (RBAC) | Login page with role selection, `/logout`, **BCrypt** password hashes, URL rules per role, plus "own account only" checks | `security/` folder + controllers |
 | **Dockerization**: Dockerfile and compose.yaml, services run together with Docker Compose | `Dockerfile` builds the app image. `compose.yaml` runs the **app + MySQL** together | `Dockerfile`, `compose.yaml` |
+| **Testing & CI/CD**: Unit & Integration tests running automatically on GitHub Actions | **6 Unit Tests** (JUnit 5) + **3 Integration Tests** (MockMvc) + GitHub Actions CI (`shadik.yml`) | `src/test/`, `.github/workflows/shadik.yml` |
 | **Note**: Admins manage all three resources, teachers only teachers, students only students | Admin → all 3. Teacher → only `/api/teachers` (403 for the others). Student → only `/api/students` (403 for the others) | `SecurityConfig.java` |
 
 ### The role rule (from the task's note)
@@ -55,6 +56,7 @@ Inside their own section, teachers and students work like in a real university:
 10. [Every file explained line by line](#10-every-file-explained-line-by-line)
 11. [Viva questions and answers](#11-viva-questions-and-answers)
 12. [Common problems](#12-common-problems)
+13. [Automated Testing & GitHub Actions CI](#13-automated-testing--github-actions-ci)
 
 ---
 
@@ -2294,3 +2296,104 @@ Import it into Postman as described in [7.2](#72-get-postman-ready-import-the-co
 | Want fresh data | IntelliJ: stop the app, delete `data/`, run. Docker: `docker compose down -v`, then `docker compose up --build`. |
 | Postman requests fail with 409 or 404 | Run the folders **in order from the top**, and start with fresh data. |
 | Docker problems | See [3.3](#33-install-docker-desktop-on-windows-once) and [3.12](#312-docker-problems-while-running). |
+
+---
+
+## 13. Automated Testing & GitHub Actions CI
+
+This project includes a complete automated test suite with **6 Unit Tests** and **3 Integration Tests**, integrated into a **GitHub Actions CI/CD Pipeline**.
+
+### 13.1 Overview of Tests
+
+| Category | Count | Technology | Purpose |
+|---|---|---|---|
+| **Unit Tests** | 6 | JUnit 5 (`org.junit.jupiter`) | Tests individual model properties and password encoding in milliseconds without loading Spring context. |
+| **Integration Tests** | 3 | `@SpringBootTest`, `MockMvc`, `@WithMockUser` | Tests full end-to-end flow: HTTP endpoints, Spring Security authorization, and database persistence. |
+| **CI Automation** | 1 | GitHub Actions (`.github/workflows/shadik.yml`) | Automatically triggers `mvn test` on every push/pull request to `main`. |
+
+### 13.2 The 6 Unit Tests
+Located in `src/test/java/com/university/ums/unit/`:
+1. **`StudentTest.java`**: Verifies `Student` model getters and setters (id, name, email, roll, department, username, password).
+2. **`TeacherTest.java`**: Verifies `Teacher` model properties including `designation` and department.
+3. **`AdminTest.java`**: Verifies `Admin` entity state and credential properties.
+4. **`CourseTest.java`**: Verifies `Course` details and `@ManyToOne` association linking `Teacher` to `Course`.
+5. **`RegistrationTest.java`**: Verifies bridge entity `Registration` linking `Student` and `Course` with section assignment.
+6. **`PasswordEncoderTest.java`**: Verifies business logic for BCrypt password hashing (`assertNotEquals(raw, encoded)`) and hash verification (`encoder.matches(raw, encoded)`).
+
+### 13.3 The 3 Integration Tests
+Located in `src/test/java/com/university/ums/integration/`:
+1. **`CourseIntegrationTest.java`**: Calls `GET /api/courses` as an authenticated student (`@WithMockUser(roles = "STUDENT")`) and asserts HTTP `200 OK` + JSON array response.
+2. **`StudentIntegrationTest.java`**: Calls `GET /api/students` as an administrator (`@WithMockUser(roles = "ADMIN")`) and asserts HTTP `200 OK` + JSON array response.
+3. **`TeacherIntegrationTest.java`**: Calls `GET /api/teachers` as an administrator (`@WithMockUser(roles = "ADMIN")`) and asserts HTTP `200 OK` + JSON array response.
+
+### 13.4 Isolated In-Memory Test Database
+Configured in `src/test/resources/application.properties`:
+```properties
+spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
+spring.jpa.hibernate.ddl-auto=create-drop
+```
+- Completely isolated in RAM (`jdbc:h2:mem:testdb`) so tests never clash with the production file database (`./data/ums`).
+- Prevents database file locking errors (`Database already in use`) both locally and on GitHub Actions runners.
+
+### 13.5 GitHub Actions Workflow (`shadik.yml`)
+Located in `.github/workflows/shadik.yml`:
+```yaml
+name: Java CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Test with Maven
+      run: mvn test
+```
+
+### 13.6 How to Run the Tests Locally
+Open a terminal in the project root and run:
+```bash
+mvn test
+```
+**Expected Output:**
+```text
+[INFO] Running com.university.ums.integration.CourseIntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.university.ums.integration.StudentIntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.university.ums.integration.TeacherIntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.university.ums.unit.AdminTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.university.ums.unit.CourseTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.university.ums.unit.PasswordEncoderTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.university.ums.unit.RegistrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.university.ums.unit.StudentTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.university.ums.unit.TeacherTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] Results:
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+
