@@ -10,6 +10,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -19,15 +20,14 @@ public class StudentIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
-    // Integration Test 2: Designed to fail to show GitHub Action error
+    // Integration Test 2: Resolved and passing
     @Test
-    @DisplayName("Integration Test 2: GET /api/students (Intentional Error)")
+    @DisplayName("Integration Test 2: GET /api/students should return 200 OK with students list")
     @WithMockUser(username = "admin", roles = {"ADMIN"})
-    void testGetAllStudentsWithError() throws Exception {
-        // The endpoint returns 200 OK, but we assert 404 NOT FOUND so the test fails
+    void testGetAllStudents() throws Exception {
         mockMvc.perform(get("/api/students")
                 .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isNotFound()); // <--- INTENTIONAL ERROR: Expecting 404, will receive 200
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
     }
 }
-
